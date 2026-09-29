@@ -1,0 +1,42 @@
+{
+  "brain": "claude",
+  "autonomy": "full",
+  "maxIterations": 3,
+  "groups": [
+    {
+      "id": "claude",
+      "models": { "hard": "opus", "medium": "sonnet", "easy": "haiku" }
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek 组",
+      "type": "openai-api",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "models": { "hard": "deepseek-reasoner", "medium": "deepseek-chat", "easy": "deepseek-chat" }
+    },
+    {
+      "id": "relay",
+      "name": "中转站组",
+      "type": "openai-api",
+      "baseUrl": "https://你的中转站地址/v1",
+      "apiKey": "${RELAY_API_KEY}",
+      "models": { "hard": "gpt-5", "medium": "qwen3-coder", "easy": "gpt-5-mini" }
+    },
+    {
+      "id": "claude-relay",
+      "name": "Claude 中转组",
+      "type": "claude-cli",
+      "env": {
+        "ANTHROPIC_BASE_URL": "https://你的中转站地址",
+        "ANTHROPIC_AUTH_TOKEN": "${RELAY_API_KEY}"
+      },
+      "models": { "hard": "opus", "medium": "sonnet", "easy": "haiku" },
+      "enabled": false
+    }
+  ],
+  "employees": [
+    { "id": "writer", "skill": "writer", "group": "deepseek" },
+    { "id": "tester2", "skill": "tester", "group": "relay" }
+  ]
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Rehearsal stand-in for `codex exec` (used by `mavis --fake` and the tests).
+// Rehearsal stand-in for `codex exec` (used by `shaniu --fake` and the tests).
 import fs from 'node:fs'
-import { classify, finalText, plan, readStdin, script, sleep, summary } from './common.mjs'
+import { answer, classify, finalText, readStdin, script, sleep, verify } from './common.mjs'
 
 const argv = process.argv.slice(2)
 if (argv.includes('--version')) {
@@ -16,7 +16,7 @@ const job = classify(prompt)
 
 if (!argv.includes('--json')) {
   await sleep(1400)
-  const text = job.mode === 'summary' ? summary() : JSON.stringify(plan(job.request || ''))
+  const text = answer(prompt)
   if (outFile) fs.writeFileSync(outFile, text)
   else console.log(text)
   process.exit(0)
@@ -24,11 +24,12 @@ if (!argv.includes('--json')) {
 
 out({ type: 'thread.started', thread_id: `fake-${Date.now()}` })
 out({ type: 'turn.started' })
-await sleep(600)
+await sleep(500)
 out({ type: 'item.completed', item: { id: 'r0', type: 'reasoning', text: `**Planning ${job.title}**` } })
 let n = 0
-for (const step of script(job)) {
-  await sleep(800 + Math.random() * 1000)
+const steps = job.mode === 'verify' ? script({ review: true }) : script(job)
+for (const step of steps) {
+  await sleep(700 + Math.random() * 900)
   const id = `item_${++n}`
   if (step.kind === 'edit' || step.kind === 'write') {
     out({ type: 'item.completed', item: { id, type: 'file_change', status: 'completed', changes: [{ path: step.file, kind: step.kind === 'write' ? 'add' : 'update' }] } })
@@ -38,8 +39,8 @@ for (const step of script(job)) {
     out({ type: 'item.completed', item: { id, type: 'command_execution', command: `bash -lc '${command}'`, exit_code: 0, status: 'completed' } })
   }
 }
-await sleep(600)
-const text = finalText(job)
+await sleep(500)
+const text = job.mode === 'verify' ? verify(job) : finalText(job)
 out({ type: 'item.completed', item: { id: 'msg', type: 'agent_message', text } })
 out({ type: 'turn.completed', usage: { input_tokens: 1200, output_tokens: 300 } })
 if (outFile) fs.writeFileSync(outFile, text)

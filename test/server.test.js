@@ -17,10 +17,14 @@ function fakeCoord() {
   return c
 }
 
-async function start(opts) {
+async function start(t, opts) {
   const coord = fakeCoord()
   const server = createServer(coord, { publicDir, ...opts })
   await new Promise((r) => server.listen(0, '127.0.0.1', r))
+  t.after(() => {
+    server.close()
+    server.closeAllConnections()
+  })
   const port = server.address().port
   const req = (p, { method = 'GET', headers = {}, body } = {}) =>
     new Promise((resolve, reject) => {
@@ -35,20 +39,19 @@ async function start(opts) {
   return { coord, server, port, req }
 }
 
-test('serves the page with a document shell and blocks path traversal', async () => {
-  const { server, req } = await start({ host: '127.0.0.1' })
+test('serves the page with a document shell and blocks path traversal', async (t) => {
+  const { server, req } = await start(t, { host: '127.0.0.1' })
   const page = await req('/')
   assert.equal(page.status, 200)
   assert.match(page.body, /^<!doctype html>/)
-  assert.match(page.body, /Mavis 像素工作室/)
+  assert.match(page.body, /傻妞像素工作室/)
   assert.equal((await req('/app.js')).status, 200)
   assert.notEqual((await req('/../package.json')).status, 200)
   assert.notEqual((await req('/%2e%2e/package.json')).status, 200)
-  server.close()
 })
 
-test('loopback mode rejects foreign Host headers and cross-site posts', async () => {
-  const { coord, server, port, req } = await start({ host: '127.0.0.1' })
+test('loopback mode rejects foreign Host headers and cross-site posts', async (t) => {
+  const { coord, server, port, req } = await start(t, { host: '127.0.0.1' })
   assert.equal((await req('/api/state', { headers: { Host: 'evil.example:80' } })).status, 403)
   const json = { 'Content-Type': 'application/json' }
   const body = JSON.stringify({ text: '你好' })
@@ -57,14 +60,12 @@ test('loopback mode rejects foreign Host headers and cross-site posts', async ()
   const ok = await req('/api/message', { method: 'POST', headers: { ...json, Origin: `http://localhost:${port}` }, body })
   assert.equal(ok.status, 200)
   assert.deepEqual(coord.posted, ['你好'])
-  server.close()
 })
 
-test('LAN mode requires the token', async () => {
-  const { server, req } = await start({ host: '0.0.0.0', token: 'secret' })
+test('LAN mode requires the token', async (t) => {
+  const { server, req } = await start(t, { host: '0.0.0.0', token: 'secret' })
   assert.equal((await req('/api/state')).status, 401)
   assert.equal((await req('/api/state?token=secret')).status, 200)
-  assert.equal((await req('/api/state', { headers: { 'X-Mavis-Token': 'secret' } })).status, 200)
+  assert.equal((await req('/api/state', { headers: { 'X-Shaniu-Token': 'secret' } })).status, 200)
   assert.equal((await req('/')).status, 200)
-  server.close()
 })

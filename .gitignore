@@ -1,5 +1,5 @@
 node_modules/
-.mavis/
-mavis.config.json
+.shaniu/
+shaniu.config.json
 *.log
 .DS_Store

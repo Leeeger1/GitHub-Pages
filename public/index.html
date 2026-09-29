@@ -1,6 +1,6 @@
 <meta charset="utf-8">
-<title>Mavis 像素工作室</title>
-<meta name="description" content="你只跟 Mavis 说话，她把任务分给 Claude Code 和 Codex，并在像素办公室里直播它们干活。">
+<title>傻妞像素工作室</title>
+<meta name="description" content="你只跟傻妞说话：她开项目会、按难度和技能把任务派给各个项目组的员工，自动验收、返工、存档。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -9,8 +9,9 @@
 <div class="app">
   <header class="top">
     <div class="brand">
-      <span class="wordmark">MAVIS</span>
-      <span class="tagline">你只管说，Claude 和 Codex 去干</span>
+      <span class="wordmark">傻妞</span>
+      <span class="wordmark-sub">PIXEL STUDIO</span>
+      <span class="tagline">你只管说，剩下的交给傻妞</span>
     </div>
     <div class="conn">
       <span id="conn" class="pill pill-wait">连接中…</span>
@@ -19,37 +20,41 @@
   </header>
 
   <main class="layout">
-    <section class="stage-wrap" aria-label="像素办公室">
-      <div class="stage" id="stage">
-        <canvas id="office" width="320" height="180" role="img" aria-label="像素办公室：Mavis 坐在中间，左边是 Claude，右边是 Codex"></canvas>
-        <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <section class="stage-wrap" aria-label="像素工作室">
+      <div class="stage">
+        <div class="scene" id="scene">
+          <canvas id="office" width="404" height="216" role="img" aria-label="像素工作室：傻妞坐在中间，各项目组的员工坐在两边的工位上"></canvas>
+          <div class="overlay" id="overlay" aria-hidden="true"></div>
+        </div>
       </div>
-      <div class="roster" id="roster"></div>
+      <div class="team" id="team" aria-label="项目组和员工"></div>
     </section>
 
-    <aside class="chat" aria-label="和 Mavis 对话">
+    <aside class="chat" aria-label="和傻妞对话">
       <div class="panel-head">
-        <h2>和 Mavis 说</h2>
+        <h2>和傻妞说</h2>
         <button type="button" id="stop" class="btn-stop" hidden>全部停下</button>
       </div>
       <div id="banner" class="banner" hidden></div>
       <div id="messages" class="messages" aria-live="polite"></div>
       <div class="suggest" id="suggest"></div>
       <form id="composer" class="composer">
-        <label for="input" class="sr-only">给 Mavis 的话</label>
-        <textarea id="input" rows="2" placeholder="比如：给首页加个暗色模式，顺便把测试补上"></textarea>
+        <label for="input" class="sr-only">给傻妞的话</label>
+        <textarea id="input" rows="2" placeholder="随便说，比如：帮我做一个记账小网站"></textarea>
         <button type="submit" id="send" class="btn-send">发送</button>
       </form>
-      <p class="hint">Enter 发送 · Shift+Enter 换行 · <code>@claude</code> <code>@codex</code> 直接点名 · <code>/stop</code> 叫停</p>
+      <p class="hint">Enter 发送 · Shift+Enter 换行 · <code>@员工</code> 点名 · <code>/招人</code> <code>/团队</code> <code>/撤销</code> <code>/stop</code></p>
     </aside>
 
     <section class="board" aria-label="任务板">
       <div class="panel-head">
         <h2>任务板</h2>
         <span id="round" class="round"></span>
+        <button type="button" id="undo" class="btn-ghost" hidden>撤销上一轮</button>
       </div>
+      <div id="meeting" class="meeting-card" hidden></div>
       <ol id="tasks" class="tasks"></ol>
-      <p id="tasks-empty" class="empty">还没有任务。跟 Mavis 说说要做什么，她会拆好分给两位工程师。</p>
+      <p id="tasks-empty" class="empty">还没有任务。跟傻妞说说要做什么，说得模糊也没关系：她会开会、拆任务、派给合适的员工，做完自己验收。</p>
     </section>
   </main>
 </div>

@@ -1,14 +1,14 @@
 {
-  "name": "mavis-office",
+  "name": "shaniu-studio",
   "version": "0.1.0",
-  "description": "Mavis：你只跟她说话，她把任务拆好分给 Claude Code 和 Codex，并在像素办公室里直播它们干活。",
+  "description": "傻妞像素工作室：你只跟傻妞说话，她按难度和技能把任务派给各个项目组（Claude Code、Codex、DeepSeek、中转站 API…）的员工，自动验收、返工、存档。",
   "type": "module",
   "bin": {
-    "mavis": "bin/mavis.js"
+    "shaniu": "bin/shaniu.js"
   },
   "scripts": {
-    "start": "node bin/mavis.js",
-    "rehearsal": "node bin/mavis.js --fake",
+    "start": "node bin/shaniu.js",
+    "rehearsal": "node bin/shaniu.js --fake",
     "test": "node --test"
   },
   "files": [
@@ -16,7 +16,8 @@
     "src",
     "public",
     "fake",
-    "mavis.config.example.json"
+    "skills",
+    "shaniu.config.example.json"
   ],
   "engines": {
     "node": ">=18"

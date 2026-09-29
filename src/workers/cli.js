@@ -1,16 +1,7 @@
 import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import { spawnCmd, truncate, firstLine } from './util.js'
-
-export const AGENT_NAMES = { claude: 'Claude', codex: 'Codex', mavis: 'Mavis' }
-
-function shortPath(p, workdir) {
-  if (!p) return ''
-  let r = String(p)
-  if (workdir && r.startsWith(workdir)) r = path.relative(workdir, r) || r
-  return truncate(r, 48)
-}
+import { CLAUDE_DENY, SAFE_COMMANDS } from '../config.js'
+import { firstLine, spawnCmd, truncate } from '../util.js'
+import { BaseWorker, shortPath } from './base.js'
 
 function cleanCmd(cmd) {
   if (Array.isArray(cmd)) cmd = cmd.join(' ')
@@ -87,6 +78,7 @@ export function createClaudeParser(workdir) {
       let error = ''
       if (!ok) {
         error = result?.subtype && result.subtype !== 'success' ? `Claude 结束状态：${result.subtype}` : ''
+        if (!error && result?.is_error) error = firstLine(result.result, 200)
         if (!error) error = firstLine(stderr, 200) || `claude 退出码 ${code}`
       }
       return { ok, text, error, cost: result?.total_cost_usd ?? null, sessionId }
@@ -169,76 +161,28 @@ export function createCodexParser(workdir) {
   }
 }
 
-export class AgentRunner {
-  constructor(id, cfg, { workdir, logDir }) {
-    this.id = id
-    this.cfg = cfg
-    this.workdir = workdir
-    this.logDir = logDir
-    this.procs = new Set()
-    this.available = false
-    this.version = ''
+/** Common run/ask flow for CLI-based workers; subclasses supply the arguments and parser. */
+class CliWorker extends BaseWorker {
+  command() {
+    return this.cfg.command || (this.type === 'claude-cli' ? 'claude' : 'codex')
   }
 
   async check() {
-    const r = await spawnCmd(this.cfg.command, ['--version'], { cwd: this.workdir, collect: true, timeoutMs: 20000 }).done
+    const r = await spawnCmd(this.command(), ['--version'], { cwd: this.workdir, env: this.env(), collect: true, timeoutMs: 20000 }).done
     this.available = r.code === 0
     this.version = this.available ? firstLine(r.stdout, 40) : ''
-    return { available: this.available, version: this.version, error: this.available ? '' : firstLine(r.stderr, 120) }
+    this.note = this.available ? '' : `没找到 ${Array.isArray(this.command()) ? 'CLI' : this.command()} 命令`
+    return this.available
   }
 
-  tmpFile(label) {
-    return path.join(os.tmpdir(), `mavis-${process.pid}-${Date.now()}-${label}.txt`)
-  }
-
-  openLog(label, prompt) {
-    try {
-      fs.mkdirSync(this.logDir, { recursive: true })
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-      const file = path.join(this.logDir, `${stamp}-${this.id}-${label}.log`)
-      const ws = fs.createWriteStream(file)
-      ws.on('error', () => {})
-      ws.write(`# ${this.id} · ${label} · ${this.workdir}\n\n## prompt\n${prompt}\n\n## output\n`)
-      return ws
-    } catch {
-      return null
-    }
-  }
-
-  track(proc) {
-    this.procs.add(proc)
-    proc.done.finally(() => this.procs.delete(proc))
-    return proc
-  }
-
-  stopAll() {
-    for (const p of this.procs) p.kill()
-  }
-
-  /** Run a real task with streaming progress. */
-  async run({ prompt, readOnly = false, onActivity = () => {}, timeoutMs, label = 'task' }) {
+  async run({ prompt, model = '', readOnly = false, onActivity = () => {}, timeoutMs, label = 'task' }) {
     const log = this.openLog(label, prompt)
     const started = Date.now()
-    let parser
-    let args
-    let outFile
-    if (this.id === 'claude') {
-      parser = createClaudeParser(this.workdir)
-      args = ['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', this.cfg.permissionMode || 'acceptEdits']
-      if (this.cfg.model) args.push('--model', this.cfg.model)
-      if (this.cfg.allowedTools?.length) args.push('--allowedTools', ...this.cfg.allowedTools)
-      if (readOnly) args.push('--disallowedTools', 'Edit,Write,MultiEdit,NotebookEdit')
-      args.push(...(this.cfg.extraArgs || []))
-    } else {
-      parser = createCodexParser(this.workdir)
-      outFile = this.tmpFile(label)
-      args = ['exec', '--json', '--skip-git-repo-check', '-C', this.workdir, '-o', outFile, '-s', readOnly ? 'read-only' : this.cfg.sandbox || 'workspace-write']
-      if (this.cfg.model) args.push('-m', this.cfg.model)
-      args.push(...(this.cfg.extraArgs || []), '-')
-    }
+    const { args, parser, outFile } = this.runArgs({ readOnly, label, model })
     const proc = this.track(
-      spawnCmd(this.cfg.command, args, {
+      spawnCmd(this.command(), args, {
         cwd: this.workdir,
+        env: this.env(),
         input: prompt,
         timeoutMs,
         onLine: (line) => {
@@ -250,42 +194,96 @@ export class AgentRunner {
     const r = await proc.done
     const res = parser.finish(r, outFile)
     if (outFile) fs.rm(outFile, { force: true }, () => {})
-    if (r.timedOut) Object.assign(res, { ok: false, error: '超时了，被 Mavis 叫停' })
+    if (r.timedOut) Object.assign(res, { ok: false, error: '超时了，被傻妞叫停' })
     else if (r.killed) Object.assign(res, { ok: false, error: '被叫停' })
-    else if (r.error?.code === 'ENOENT') Object.assign(res, { ok: false, error: `找不到命令 ${this.cfg.command}` })
-    log?.end(`\n## stderr\n${r.stderr}\n\n## result (${Date.now() - started}ms)\n${JSON.stringify(res, null, 2)}\n`)
+    else if (r.error?.code === 'ENOENT') Object.assign(res, { ok: false, error: `找不到命令 ${this.command()}` })
     res.durationMs = Date.now() - started
+    log?.end(`\n## stderr\n${r.stderr}\n\n## result (${res.durationMs}ms)\n${JSON.stringify(res, null, 2)}\n`)
     return res
   }
+}
 
-  /** One-shot question with no file edits — used for planning and summaries. */
+export class ClaudeCliWorker extends CliWorker {
+  permissionArgs(readOnly) {
+    const c = this.cfg
+    const args = ['--permission-mode', c.permissionMode || 'acceptEdits']
+    let allow = c.allowedTools
+    if (!allow) {
+      allow =
+        this.autonomy === 'safe'
+          ? SAFE_COMMANDS.map((p) => `Bash(${p}:*)`)
+          : ['Bash', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch', 'TodoWrite', 'Task']
+    }
+    if (allow.length) args.push('--allowedTools', ...allow)
+    const deny = [...(c.disallowedTools || CLAUDE_DENY)]
+    if (readOnly) deny.push('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
+    if (deny.length) args.push('--disallowedTools', ...deny)
+    return args
+  }
+
+  modelArgs(model) {
+    if (!model) return []
+    // If the chosen model isn't available on this account (or is overloaded), Claude Code falls back.
+    const fallback = this.cfg.fallbackModel ?? 'sonnet'
+    return fallback && fallback !== model ? ['--model', model, '--fallback-model', fallback] : ['--model', model]
+  }
+
+  runArgs({ readOnly, model }) {
+    const args = ['-p', '--output-format', 'stream-json', '--verbose', ...this.permissionArgs(readOnly), ...this.modelArgs(model)]
+    args.push(...(this.cfg.extraArgs || []))
+    return { args, parser: createClaudeParser(this.workdir) }
+  }
+
+  /** One-shot question with no edits: planning, acceptance notes, reports. Read-only tools stay available. */
   async ask(prompt, { model, timeoutMs = 5 * 60 * 1000, label = 'ask' } = {}) {
     const log = this.openLog(label, prompt)
-    let args
-    let outFile
-    if (this.id === 'claude') {
-      args = ['-p', '--output-format', 'json', '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task,Agent']
-      if (model || this.cfg.model) args.push('--model', model || this.cfg.model)
-    } else {
-      outFile = this.tmpFile(label)
-      args = ['exec', '--skip-git-repo-check', '-C', this.workdir, '-s', 'read-only', '-o', outFile]
-      if (model || this.cfg.model) args.push('-m', model || this.cfg.model)
-      args.push('-')
-    }
-    const proc = this.track(spawnCmd(this.cfg.command, args, { cwd: this.workdir, input: prompt, collect: true, timeoutMs }))
+    const args = ['-p', '--output-format', 'json', '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task,Agent']
+    args.push(...this.modelArgs(model || this.modelFor('medium')))
+    const proc = this.track(spawnCmd(this.command(), args, { cwd: this.workdir, env: this.env(), input: prompt, collect: true, timeoutMs }))
     const r = await proc.done
     log?.end(`${r.stdout}\n\n## stderr\n${r.stderr}\n`)
     if (r.killed || r.timedOut) throw new Error(r.timedOut ? '想太久超时了' : '被叫停')
-    if (this.id === 'claude') {
-      let obj = null
-      try {
-        obj = JSON.parse(r.stdout)
-      } catch {}
-      if (Array.isArray(obj)) obj = obj.findLast?.((e) => e.type === 'result') || obj[obj.length - 1]
-      if (!obj) throw new Error(firstLine(r.stderr, 200) || `claude 退出码 ${r.code}`)
-      if (obj.is_error) throw new Error(firstLine(obj.result, 200) || 'claude 返回了错误')
-      return String(obj.result ?? '')
+    let obj = null
+    try {
+      obj = JSON.parse(r.stdout)
+    } catch {}
+    if (Array.isArray(obj)) obj = obj.findLast?.((e) => e.type === 'result') || obj[obj.length - 1]
+    if (!obj) throw new Error(firstLine(r.stderr, 200) || `claude 退出码 ${r.code}`)
+    if (obj.is_error) throw new Error(firstLine(obj.result, 200) || 'claude 返回了错误')
+    return String(obj.result ?? '')
+  }
+}
+
+export class CodexCliWorker extends CliWorker {
+  sandboxArgs(readOnly) {
+    if (readOnly) return ['-s', 'read-only']
+    const sandbox = this.cfg.sandbox || 'workspace-write'
+    const args = ['-s', sandbox]
+    // Full autonomy lets Codex install packages; its sandbox still keeps writes inside the project.
+    if (sandbox === 'workspace-write' && this.autonomy !== 'safe' && this.cfg.network !== false) {
+      args.push('-c', 'sandbox_workspace_write.network_access=true')
     }
+    return args
+  }
+
+  runArgs({ readOnly, label, model }) {
+    const outFile = this.tmpFile(label)
+    const args = ['exec', '--json', '--skip-git-repo-check', '-C', this.workdir, '-o', outFile, ...this.sandboxArgs(readOnly)]
+    if (model) args.push('-m', model)
+    args.push(...(this.cfg.extraArgs || []), '-')
+    return { args, parser: createCodexParser(this.workdir), outFile }
+  }
+
+  async ask(prompt, { model, timeoutMs = 5 * 60 * 1000, label = 'ask' } = {}) {
+    const log = this.openLog(label, prompt)
+    const outFile = this.tmpFile(label)
+    const args = ['exec', '--skip-git-repo-check', '-C', this.workdir, '-s', 'read-only', '-o', outFile]
+    if (model || this.modelFor('medium')) args.push('-m', model || this.modelFor('medium'))
+    args.push(...(this.cfg.extraArgs || []), '-')
+    const proc = this.track(spawnCmd(this.command(), args, { cwd: this.workdir, env: this.env(), input: prompt, collect: true, timeoutMs }))
+    const r = await proc.done
+    log?.end(`${r.stdout}\n\n## stderr\n${r.stderr}\n`)
+    if (r.killed || r.timedOut) throw new Error(r.timedOut ? '想太久超时了' : '被叫停')
     let text = ''
     try {
       text = fs.readFileSync(outFile, 'utf8')

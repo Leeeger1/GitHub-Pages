@@ -101,21 +101,7 @@ export function spawnCmd(command, args, opts = {}) {
   const kill = () => {
     if (killed || child.exitCode !== null) return
     killed = true
-    try {
-      if (isWin) spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true })
-      else process.kill(-child.pid, 'SIGTERM')
-    } catch {
-      try {
-        child.kill('SIGTERM')
-      } catch {}
-    }
-    if (!isWin) {
-      setTimeout(() => {
-        try {
-          process.kill(-child.pid, 'SIGKILL')
-        } catch {}
-      }, 3000).unref()
-    }
+    killTree(child)
   }
 
   const done = new Promise((resolve) => {
@@ -161,6 +147,69 @@ export function spawnCmd(command, args, opts = {}) {
   return { child, kill, done }
 }
 
+/** Kill a child and everything it started (the child must be spawned detached on Unix). */
+export function killTree(child) {
+  try {
+    if (isWin) spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true })
+    else process.kill(-child.pid, 'SIGTERM')
+  } catch {
+    try {
+      child.kill('SIGTERM')
+    } catch {}
+  }
+  if (!isWin) {
+    setTimeout(() => {
+      try {
+        process.kill(-child.pid, 'SIGKILL')
+      } catch {}
+    }, 3000).unref()
+  }
+}
+
+/** Run a shell command line (used by the built-in API agent's run_command tool). */
+export function runShell(command, { cwd, timeoutMs = 120000, onSpawn } = {}) {
+  return new Promise((resolve) => {
+    const env = { ...process.env }
+    delete env.CLAUDECODE
+    let child
+    try {
+      child = spawn(command, { cwd, env, shell: true, detached: !isWin, windowsHide: true })
+    } catch (e) {
+      resolve({ code: -1, out: e.message, timedOut: false })
+      return
+    }
+    onSpawn?.(child)
+    let out = ''
+    let timedOut = false
+    const add = (d) => {
+      out += d.toString()
+      if (out.length > 400000) out = out.slice(-400000)
+    }
+    child.stdout.on('data', add)
+    child.stderr.on('data', add)
+    child.stdin.on('error', () => {})
+    child.stdin.end()
+    const timer = setTimeout(() => {
+      timedOut = true
+      killTree(child)
+    }, timeoutMs)
+    child.on('error', (e) => {
+      clearTimeout(timer)
+      resolve({ code: -1, out: out + e.message, timedOut })
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      resolve({ code: code ?? -1, out, timedOut })
+    })
+  })
+}
+
+/** Replace ${NAME} with environment variables, so API keys can stay out of config files. */
+export function fillEnv(value) {
+  if (typeof value !== 'string') return value
+  return value.replace(/\$\{(\w+)\}/g, (_, k) => process.env[k] ?? '')
+}
+
 /** Small git/filesystem snapshot so the planner knows what project it is looking at. */
 export async function projectContext(workdir) {
   const git = async (...a) => {
@@ -178,8 +227,17 @@ export async function projectContext(workdir) {
   } else {
     files = walk(workdir, 3)
   }
+  const keyFiles = []
+  for (const name of ['README.md', 'readme.md', 'package.json', 'pyproject.toml', 'requirements.txt', 'go.mod', 'Cargo.toml']) {
+    if (keyFiles.length >= 3) break
+    try {
+      const text = fs.readFileSync(path.join(workdir, name), 'utf8')
+      keyFiles.push({ name, text: truncate(text, 1500) })
+    } catch {}
+  }
   return {
     workdir,
+    keyFiles,
     isGit: inside,
     branch,
     fileCount: files.length,
@@ -188,7 +246,7 @@ export async function projectContext(workdir) {
   }
 }
 
-const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.venv', 'venv', '__pycache__', '.mavis', 'target'])
+export const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.venv', 'venv', '__pycache__', '.shaniu', 'target', '.pytest_cache', '.mypy_cache'])
 
 function walk(root, depth, rel = '', out = []) {
   if (depth < 0 || out.length > 300) return out
@@ -199,7 +257,7 @@ function walk(root, depth, rel = '', out = []) {
     return out
   }
   for (const e of entries) {
-    if (SKIP.has(e.name) || e.name.startsWith('.')) continue
+    if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue
     const p = rel ? `${rel}/${e.name}` : e.name
     if (e.isDirectory()) walk(root, depth - 1, p, out)
     else out.push(p)
