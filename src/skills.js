@@ -29,8 +29,8 @@ export function parseSkill(text, id) {
 export function skillDirs(root, workdir) {
   return [
     { dir: path.join(root, 'skills'), source: 'builtin' },
-    { dir: path.join(os.homedir(), '.shaniu', 'skills'), source: 'user' },
-    { dir: path.join(workdir, '.shaniu', 'skills'), source: 'project' },
+    { dir: path.join(os.homedir(), '.niuma', 'skills'), source: 'user' },
+    { dir: path.join(workdir, '.niuma', 'skills'), source: 'project' },
   ]
 }
 

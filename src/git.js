@@ -11,10 +11,10 @@ const EXCLUDES = [
   ':(glob,exclude)**/__pycache__/**',
   ':(glob,exclude)**/.env',
   ':(glob,exclude)**/.env.*',
-  ':(glob,exclude)**/shaniu.config.json',
+  ':(glob,exclude)**/niuma.config.json',
 ]
 
-const DEFAULT_IGNORE = ['node_modules/', '.venv/', 'venv/', '__pycache__/', '.env', '.env.*', 'shaniu.config.json', '.DS_Store', '*.log', ''].join('\n')
+const DEFAULT_IGNORE = ['node_modules/', '.venv/', 'venv/', '__pycache__/', '.env', '.env.*', 'niuma.config.json', '.DS_Store', '*.log', ''].join('\n')
 
 export function git(dir, ...args) {
   return spawnCmd('git', args, { cwd: dir, collect: true, timeoutMs: 60000 }).done.then((r) => ({ ...r, out: r.stdout.trim() }))

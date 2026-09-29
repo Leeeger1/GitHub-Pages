@@ -14,7 +14,7 @@ import { createClaudeParser, createCodexParser, describeClaudeTool } from '../sr
 import { extractJson } from '../src/util.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'shaniu-test-'))
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'niuma-test-'))
 
 // Keep hired skills and stats out of the real home directory.
 process.env.HOME = tmp()
@@ -63,8 +63,8 @@ test('skills parse, and a skill file with a group becomes an employee', () => {
   for (const id of ['generalist', 'architect', 'frontend', 'backend', 'tester', 'reviewer', 'debugger', 'writer']) assert.ok(builtin.has(id), id)
 
   const work = tmp()
-  fs.mkdirSync(path.join(work, '.shaniu', 'skills', 'sql'), { recursive: true })
-  fs.writeFileSync(path.join(work, '.shaniu', 'skills', 'sql', 'SKILL.md'), '---\nname: SQL 专家\ndescription: 写查询\ngroup: codex\n---\n规则')
+  fs.mkdirSync(path.join(work, '.niuma', 'skills', 'sql'), { recursive: true })
+  fs.writeFileSync(path.join(work, '.niuma', 'skills', 'sql', 'SKILL.md'), '---\nname: SQL 专家\ndescription: 写查询\ngroup: codex\n---\n规则')
   const cfg = merge(DEFAULTS, { groups: [{ id: 'deepseek', type: 'openai-api', model: 'deepseek-chat' }] })
   const team = new Team(cfg, { root, workdir: work, logDir: work })
   assert.ok(team.employee('sql'), 'skill folder hired as an employee')
@@ -152,7 +152,7 @@ test('claude and codex output parsers', () => {
 // ---- full rehearsals with the fake company -----------------------------------------------
 
 async function rehearsal(t, overrides = {}) {
-  process.env.SHANIU_FAKE_SPEED = '0.02'
+  process.env.NIUMA_FAKE_SPEED = '0.02'
   const r = await rehearsalConfig(loadConfig({ workdir: root }), root)
   const c = new Coordinator({ ...r.config, workdir: root, dispatchDelayMs: 0, ...overrides }, { mode: 'fake', root })
   t.after(() => {
@@ -266,7 +266,7 @@ test('meeting minutes are saved into the project, each round is committed, and /
 
 test('/stop halts a running round', async (t) => {
   const c = await rehearsal(t, { dispatchDelayMs: 50 })
-  process.env.SHANIU_FAKE_SPEED = '1'
+  process.env.NIUMA_FAKE_SPEED = '1'
   const done = idle(c)
   c.post('做一个记账小网站')
   await new Promise((r) => {

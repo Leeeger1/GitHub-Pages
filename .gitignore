@@ -1,5 +1,5 @@
 node_modules/
-.shaniu/
-shaniu.config.json
+.niuma/
+niuma.config.json
 *.log
 .DS_Store

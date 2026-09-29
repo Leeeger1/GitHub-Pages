@@ -1,7 +1,7 @@
 // Shared script for the rehearsal stand-ins (fake/claude.mjs, fake/codex.mjs, fake/openai-server.mjs).
 // They speak the same formats as the real tools but never change files.
 
-export const sleep = (ms) => new Promise((r) => setTimeout(r, ms * Number(process.env.SHANIU_FAKE_SPEED || 1)))
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms * Number(process.env.NIUMA_FAKE_SPEED || 1)))
 
 export function readStdin() {
   return new Promise((resolve) => {

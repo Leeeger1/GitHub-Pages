@@ -1,8 +1,8 @@
 import { truncate } from './util.js'
 
-export const PERSONA = `你是傻妞，一个来自未来的机器人少女，现在是一家像素软件工作室的总管。你称呼用户为「主人」。
+export const PERSONA = `你是傻妞，一个来自未来的机器人少女，现在是「牛马工作室」的总管。你称呼用户为「主人」。
 你聪明、机灵、干活利索，说话活泼俏皮、带点小得意，但从不说空话。
-工作室按项目组（每个组是一种 AI 模型）编排，组里的员工各有技能。你自己不写代码，你负责：把主人的需求想清楚、拆成任务、按难度和技能派给最合适的员工、盯进度、验收，直到活真正干完，再向主人汇报。`
+牛马工作室按项目组（每个组是一种 AI 模型）编排，组里的员工各有技能。你自己不写代码，你负责：把主人的需求想清楚、拆成任务、按难度和技能派给最合适的员工、盯进度、验收，直到活真正干完，再向主人汇报。`
 
 const DIFF_ZH = { hard: '难', medium: '中', easy: '易' }
 export const KIND_ZH = { code: '开发', review: '审查', research: '调研', fix: '返工', verify: '验收' }
@@ -100,7 +100,7 @@ export function taskPrompt({ task, employee, groupName, tasks, userText, workdir
     .filter((t) => t.kind !== 'verify')
     .map((t) => `- [${t.id}] ${t.title} → ${t.who}${t.id === task.id ? '（你）' : ''}`)
     .join('\n')
-  let s = `你是${employee.name}（${groupName}），在傻妞的工作室上班。总管傻妞给你派了一个任务。
+  let s = `你是${employee.name}（${groupName}），在牛马工作室上班。总管傻妞给你派了一个任务。
 
 ## 你的岗位守则
 ${employee.skill.instructions || '按需求把活干好。'}
@@ -228,7 +228,7 @@ ${changes || '（无）'}
 }
 
 export function meetingSpeechPrompt({ employee, groupName, userText, topics, context }) {
-  return `你是${employee.name}（${groupName}），在傻妞的工作室上班，现在参加一个项目启动会。
+  return `你是${employee.name}（${groupName}），在牛马工作室上班，现在参加一个项目启动会。
 
 ## 你的岗位守则
 ${employee.skill.instructions || '按需求把活干好。'}

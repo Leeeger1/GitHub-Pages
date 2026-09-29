@@ -208,7 +208,7 @@
         this.overlay.appendChild(el)
         return el
       }
-      add('sign', '傻妞工作室', this.cx, 20)
+      add('sign', '牛马工作室', this.cx, 20)
       for (const p of this.pods) add('pod-sign', p.g.name + (p.g.available ? '' : ' · 未到岗'), p.x + p.w / 2, 70, p.g.color)
       for (const [id, s] of Object.entries(this.seats)) add('tag' + (s.boss ? ' tag-boss' : ''), s.emp.name, s.x, s.top + 16, s.boss ? '' : s.pod.g.color)
       for (const v of this.vacant) add('tag tag-vacant', '招人中', v.x, v.top + 16)

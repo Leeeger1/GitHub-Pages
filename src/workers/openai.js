@@ -198,7 +198,7 @@ export class Toolbox {
 }
 
 function systemPrompt({ workdir, readOnly }) {
-  return `你是一名软件工程师，在傻妞的工作室里干活。
+  return `你是一名软件工程师，在牛马工作室里干活。
 工作目录：${workdir}（${os.platform()}）。你只能通过工具读写这个目录里的文件、运行命令。
 做事方式：
 - 先了解再动手：用 list_files、search、read_file 看清楚。

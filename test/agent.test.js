@@ -7,7 +7,7 @@ import { startFakeOpenAI } from '../fake/openai-server.mjs'
 import * as git from '../src/git.js'
 import { OpenAIWorker, Toolbox } from '../src/workers/openai.js'
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'shaniu-agent-'))
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'niuma-agent-'))
 
 test('toolbox reads, writes, edits and searches inside the project only', async () => {
   const dir = tmp()
@@ -31,7 +31,7 @@ test('toolbox reads, writes, edits and searches inside the project only', async 
 })
 
 test('the built-in API agent loops through tool calls against an OpenAI-compatible endpoint', async () => {
-  process.env.SHANIU_FAKE_SPEED = '0.01'
+  process.env.NIUMA_FAKE_SPEED = '0.01'
   const api = await startFakeOpenAI()
   const dir = tmp()
   fs.writeFileSync(path.join(dir, 'index.js'), 'function main() {}\n')
@@ -46,9 +46,9 @@ test('the built-in API agent loops through tool calls against an OpenAI-compatib
   const plan = JSON.parse(await w.ask('## 主人刚刚说\n做个网站\n## 你要决定'))
   assert.ok(Array.isArray(plan.tasks))
 
-  const noKey = new OpenAIWorker({ id: 'x', type: 'openai-api', baseUrl: api.url, model: 'm', apiKeyEnv: 'SHANIU_TEST_MISSING_KEY' }, { workdir: dir, logDir: dir })
+  const noKey = new OpenAIWorker({ id: 'x', type: 'openai-api', baseUrl: api.url, model: 'm', apiKeyEnv: 'NIUMA_TEST_MISSING_KEY' }, { workdir: dir, logDir: dir })
   assert.equal(await noKey.check(), false)
-  assert.match(noKey.note, /SHANIU_TEST_MISSING_KEY/)
+  assert.match(noKey.note, /NIUMA_TEST_MISSING_KEY/)
   api.close()
 })
 

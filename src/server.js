@@ -57,7 +57,7 @@ export function createServer(coord, { publicDir, host, token }) {
       return false
     }
   }
-  const authOk = (req, url) => !token || req.headers['x-shaniu-token'] === token || url.searchParams.get('token') === token
+  const authOk = (req, url) => !token || req.headers['x-niuma-token'] === token || url.searchParams.get('token') === token
 
   const readBody = (req) =>
     new Promise((resolve, reject) => {
@@ -75,7 +75,7 @@ export function createServer(coord, { publicDir, host, token }) {
     })
 
   return http.createServer(async (req, res) => {
-    const url = new URL(req.url, 'http://shaniu.local')
+    const url = new URL(req.url, 'http://niuma.local')
     // Blocks DNS-rebinding: a page on another domain can't talk to us through a hostname it controls.
     if (!hostOk(req)) return send(res, 403, 'Forbidden host')
 

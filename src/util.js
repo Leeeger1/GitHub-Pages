@@ -246,7 +246,7 @@ export async function projectContext(workdir) {
   }
 }
 
-export const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.venv', 'venv', '__pycache__', '.shaniu', 'target', '.pytest_cache', '.mypy_cache'])
+export const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.venv', 'venv', '__pycache__', '.niuma', 'target', '.pytest_cache', '.mypy_cache'])
 
 function walk(root, depth, rel = '', out = []) {
   if (depth < 0 || out.length > 300) return out

@@ -37,8 +37,8 @@ export const DEFAULTS = {
     // Save a commit before and after each round.
     autoCommit: true,
   },
-  logDir: '~/.shaniu/logs',
-  statsFile: '~/.shaniu/stats.json',
+  logDir: '~/.niuma/logs',
+  statsFile: '~/.niuma/stats.json',
   // 项目组 = a model backend. `models` picks a model per task difficulty.
   // type: claude-cli (Claude Code) | codex-cli (Codex) | openai-api (any OpenAI-compatible API / relay)
   groups: [
@@ -108,11 +108,11 @@ function readJson(file) {
   }
 }
 
-/** defaults ← ~/.shaniu/config.json ← <workdir>/shaniu.config.json ← --config file ← CLI flags */
+/** defaults ← ~/.niuma/config.json ← <workdir>/niuma.config.json ← --config file ← CLI flags */
 export function loadConfig({ workdir, configFile, overrides = {} }) {
   let cfg = DEFAULTS
   const sources = []
-  for (const f of [path.join(os.homedir(), '.shaniu', 'config.json'), path.join(workdir, 'shaniu.config.json'), configFile]) {
+  for (const f of [path.join(os.homedir(), '.niuma', 'config.json'), path.join(workdir, 'niuma.config.json'), configFile]) {
     if (!f) continue
     const data = readJson(f)
     if (data) {

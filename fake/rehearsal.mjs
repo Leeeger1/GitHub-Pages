@@ -1,4 +1,4 @@
-// Rehearsal company for `shaniu --fake` and the tests: fake Claude / Codex CLIs plus two
+// Rehearsal company for `niuma --fake` and the tests: fake Claude / Codex CLIs plus two
 // project groups behind a local fake OpenAI-compatible API. Nothing costs money or changes files.
 import fs from 'node:fs'
 import os from 'node:os'
@@ -9,7 +9,7 @@ import { startFakeOpenAI } from './openai-server.mjs'
 export async function rehearsalConfig(config, root) {
   const api = await startFakeOpenAI()
   const node = (file) => [process.execPath, path.join(root, 'fake', file)]
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shaniu-rehearsal-'))
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'niuma-rehearsal-'))
   return {
     close: api.close,
     config: {

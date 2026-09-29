@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Rehearsal stand-in for `claude -p` (used by `shaniu --fake` and the tests).
+// Rehearsal stand-in for `claude -p` (used by `niuma --fake` and the tests).
 import { answer, classify, finalText, readStdin, script, sleep, verify } from './common.mjs'
 
 const argv = process.argv.slice(2)

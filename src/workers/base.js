@@ -45,7 +45,7 @@ export class BaseWorker {
   }
 
   tmpFile(label) {
-    return path.join(os.tmpdir(), `shaniu-${process.pid}-${Date.now()}-${this.id}-${label}.txt`)
+    return path.join(os.tmpdir(), `niuma-${process.pid}-${Date.now()}-${this.id}-${label}.txt`)
   }
 
   openLog(label, prompt) {

@@ -75,7 +75,7 @@ button { font: inherit; color: inherit; }
   color: var(--accent);
   text-shadow: 3px 3px 0 var(--drop);
 }
-.wordmark-sub { font: 700 12px/1 var(--font-pixel); letter-spacing: 0.12em; color: var(--ink); }
+.wordmark-sub { font: 700 13px/1 var(--font-body); letter-spacing: 0.08em; color: var(--ink); }
 .tagline { color: var(--muted); font-size: 13px; }
 .conn { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
 .workdir { color: var(--muted); max-width: 44ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Rehearsal stand-in for `codex exec` (used by `shaniu --fake` and the tests).
+// Rehearsal stand-in for `codex exec` (used by `niuma --fake` and the tests).
 import fs from 'node:fs'
 import { answer, classify, finalText, readStdin, script, sleep, verify } from './common.mjs'
 

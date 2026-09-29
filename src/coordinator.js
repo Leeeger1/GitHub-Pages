@@ -208,9 +208,9 @@ export class Coordinator extends EventEmitter {
     const hello = hour < 6 ? '主人还没睡呀' : hour < 12 ? '主人早上好' : hour < 18 ? '主人下午好' : '主人晚上好'
     const staff = this.team.employees.filter((e) => this.team.isAvailable(e.id)).length
     const team = on.length
-      ? `${on.map((g) => g.name).join('、')}共 ${staff} 位员工已就位`
+      ? `${on.map((g) => g.name).join('、')}共 ${staff} 位牛马已就位`
       : '可是一个项目组都没到岗（没找到 claude / codex 命令，也没配置 API），先帮傻妞把员工请来吧'
-    this.addMessage('shaniu', `${hello}！傻妞上线啦～ ${team}。工作目录是 \`${this.workdir}\`。需求说得模糊也没关系，剩下的交给傻妞！`)
+    this.addMessage('shaniu', `${hello}！牛马工作室开工啦～ ${team}。工作目录是 \`${this.workdir}\`。需求说得模糊也没关系，剩下的交给傻妞！`)
   }
 
   syncAgents() {
@@ -896,7 +896,7 @@ export class Coordinator extends EventEmitter {
       if (!o || !o.name || !o.instructions) return this.addMessage('shaniu', '唔，岗位说明没写好，主人再描述具体一点？')
       const group = this.team.groups.has(o.group) ? o.group : this.brain().id
       const id = skillId(o.id || o.name)
-      const file = writeSkill(path.join(os.homedir(), '.shaniu', 'skills'), {
+      const file = writeSkill(path.join(os.homedir(), '.niuma', 'skills'), {
         id,
         name: String(o.name),
         description: String(o.description || ''),

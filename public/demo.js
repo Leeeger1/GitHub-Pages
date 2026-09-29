@@ -81,7 +81,7 @@ src/
     const model = (id, diff) => GROUPS.find((g) => g.id === roster.employees.find((e) => e.id === id).group).models[diff] || ''
 
     emit({ type: 'snapshot', state: { mode: 'demo', workdir: '~/projects/pocket-ledger', busy: false, round: 0, iteration: 0, roster, agents, tasks: [], messages: [], meeting: null, lastCommit: null } })
-    msg('shaniu', '主人晚上好！傻妞上线啦～ Claude 组、Codex 组、DeepSeek 组、Qwen 组共 8 位员工已就位。需求说得模糊也没关系，剩下的交给傻妞！')
+    msg('shaniu', '主人晚上好！牛马工作室开工啦～ Claude 组、Codex 组、DeepSeek 组、Qwen 组共 8 位牛马已就位。需求说得模糊也没关系，剩下的交给傻妞！')
 
     async function runTask(t, my) {
       Object.assign(t, { status: 'running', startedAt: now(), model: model(t.agent, t.difficulty) })
@@ -212,7 +212,7 @@ src/
         roster.employees.push({ id, name: who, group: 'qwen', look: ['glasses', 'cap', 'beret', 'headphones'][roster.employees.length % 4], description: `${who}（演示招来的同事）`, color: '#7a52e0', available: true, stats: null })
         agents[id] = { status: 'idle', text: '', available: true }
         emit({ type: 'roster', roster, agents })
-        return msg('shaniu', `新同事到岗啦！**${who}**，坐在 Qwen 组。岗位说明存在 \`~/.shaniu/skills/${id}.md\`，主人随时可以改。`)
+        return msg('shaniu', `新同事到岗啦！**${who}**，坐在 Qwen 组。岗位说明存在 \`~/.niuma/skills/${id}.md\`，主人随时可以改。`)
       }
       agent('shaniu', { status: 'thinking', text: '让傻妞想想怎么安排…' })
       await wait(2000)

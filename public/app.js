@@ -266,7 +266,7 @@
   function renderBanner() {
     const el = $('#banner')
     if (state.mode === 'demo') {
-      el.innerHTML = '这是演示：员工都是演员，不会真的改代码。在电脑上运行 <code>node bin/shaniu.js 你的项目目录</code>，他们就会真的开工。'
+      el.innerHTML = '这是演示：员工都是演员，不会真的改代码。在电脑上运行 <code>node bin/niuma.js 你的项目目录</code>，他们就会真的开工。'
       el.hidden = false
     } else if (state.mode === 'fake') {
       el.innerHTML = '彩排模式：员工都是替身，不花钱、不改文件。去掉 <code>--fake</code> 就是真干活。'
@@ -379,7 +379,7 @@
     es.onopen = () => setConn(state.mode === 'fake' ? 'fake' : 'live')
     es.onerror = () => setConn('off')
     const post = async (url, body) => {
-      const r = await fetch(url + q, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shaniu-Token': token }, body: JSON.stringify(body) })
+      const r = await fetch(url + q, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Niuma-Token': token }, body: JSON.stringify(body) })
       if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
     }
     return { send: (text) => post('/api/message', { text }), stop: () => post('/api/stop', {}) }
@@ -432,8 +432,8 @@
   ;(async () => {
     let token = ''
     try {
-      token = new URLSearchParams(location.search).get('token') || sessionStorage.getItem('shaniu-token') || ''
-      if (token) sessionStorage.setItem('shaniu-token', token)
+      token = new URLSearchParams(location.search).get('token') || sessionStorage.getItem('niuma-token') || ''
+      if (token) sessionStorage.setItem('niuma-token', token)
     } catch {}
     renderSuggest()
     if (await detectServer(token)) transport = connectLive(token)

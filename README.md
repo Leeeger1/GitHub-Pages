@@ -1,10 +1,10 @@
-# 傻妞像素工作室
+# 牛马工作室
 
-你只跟**傻妞**说话。她是这家像素软件工作室的总管：听懂你要什么（说得模糊也没关系），召集员工开项目会、按难度和技能派活、盯进度、安排审查和验收，没做完就自己组织下一轮，直到真正做完，再向你汇报。整个过程不需要你插手。
+一家 AI 牛马组成的像素软件工作室。你只跟总管**傻妞**说话：她听懂你要什么（说得模糊也没关系），召集员工开项目会、按难度和技能派活、盯进度、安排审查和验收，没做完就自己组织下一轮，直到真正做完，再向你汇报。整个过程不需要你插手。
 
 工作室按**项目组**编排，每个项目组就是一种 AI 模型：Claude Code、Codex、DeepSeek、中转站 API……组里坐着各有技能的**员工**，每个员工就是一个 skill 文件。所有人在一间像素办公室里上班：谁在读哪个文件、跑什么命令，头顶气泡里都看得到；开会时大家走到会议桌边发言；派活时傻妞会起身把任务单送到工位上。
 
-![傻妞像素工作室](docs/screenshot.png)
+![牛马工作室](docs/screenshot.png)
 
 ## 一个需求是怎么被做完的
 
@@ -30,18 +30,18 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/Leeeger1/GitHub-Pages.git shaniu
-cd shaniu
+git clone https://github.com/Leeeger1/GitHub-Pages.git niuma
+cd niuma
 
 # 先彩排：用替身员工演一遍完整流程，不花钱、不改文件
-node bin/shaniu.js --fake
+node bin/niuma.js --fake
 
 # 真干活：把你的项目目录传进去（空文件夹也行，傻妞会从零开始建项目）
-node bin/shaniu.js ~/code/my-project
-# Windows：node bin\shaniu.js D:\code\my-project
+node bin/niuma.js ~/code/my-project
+# Windows：node bin\niuma.js D:\code\my-project
 ```
 
-浏览器会自动打开 `http://localhost:7777`。想在任何目录直接敲 `shaniu`，在仓库目录里运行一次 `npm link`。
+浏览器会自动打开 `http://localhost:7777`。想在任何目录直接敲 `niuma`，在仓库目录里运行一次 `npm link`。
 
 ## 公司架构
 
@@ -85,7 +85,7 @@ node bin/shaniu.js ~/code/my-project
 ```
 
 - `models` 按难度指定型号；只写 `model` 就是所有难度都用它。
-- API Key 建议放环境变量：`apiKeyEnv` 写变量名，或者在任何字段里用 `${变量名}`。不要把 Key 直接写进项目目录里的配置文件（傻妞的自动存档会跳过 `shaniu.config.json` 和 `.env`，但放在 `~/.shaniu/config.json` 更稳妥）。
+- API Key 建议放环境变量：`apiKeyEnv` 写变量名，或者在任何字段里用 `${变量名}`。不要把 Key 直接写进项目目录里的配置文件（傻妞的自动存档会跳过 `niuma.config.json` 和 `.env`，但放在 `~/.niuma/config.json` 更稳妥）。
 - 其他可选字段：`color`（工位颜色）、`maxParallel`（这个组同时最多干几件活）、`strengths` / `tier` / `cost`（覆盖傻妞对这个模型的判断）、`price`（每百万 token 的输入/输出价格，用来在任务板上显示花费）、`headers`、`maxTokens`、`temperature`、`extraArgs`（传给命令行的额外参数）、`enabled: false`（整组放假）。
 
 傻妞认识常见模型的档次和价位（Opus/Sonnet/Haiku、GPT、Codex、DeepSeek、Qwen、Kimi、GLM、Gemini……），没认出来的按 `tier`、`cost` 字段或者默认值算。
@@ -111,7 +111,7 @@ look: glasses
 - `look` 是像素小人的配饰：`none` `glasses` `headphones` `cap` `beret` `helmet` `bandana` `bun`。
 - 正文是岗位守则，这个员工每次干活都会先读它。
 
-**把文件放进 `~/.shaniu/skills/`（所有项目通用）或 `项目目录/.shaniu/skills/`（只在这个项目），它就是一名新员工。**也支持 `名字/SKILL.md` 的文件夹写法。或者直接对傻妞说「/招人 数据库专家」，她会自己写好岗位说明，把人招进合适的项目组。
+**把文件放进 `~/.niuma/skills/`（所有项目通用）或 `项目目录/.niuma/skills/`（只在这个项目），它就是一名新员工。**也支持 `名字/SKILL.md` 的文件夹写法。或者直接对傻妞说「/招人 数据库专家」，她会自己写好岗位说明，把人招进合适的项目组。
 
 内置岗位在 `skills/` 目录：全栈工程师、架构师、前端工程师、后端工程师、测试工程师、代码审查员、排错专家、文档专员。默认编制是 Claude 组坐架构师、前端、审查员，Codex 组坐后端、测试、排错专家。在配置里用 `employees` 调整：
 
@@ -152,13 +152,13 @@ look: glasses
 
 不管哪种模式，这些命令都不会自动执行：`sudo`、`git push`、`git reset --hard`、`git clean`、`rm -rf /`、`rm -rf ~`。审查和验收是只读的。
 
-兜底靠 Git：每一轮开工前把你没提交的改动先存一档，完工后再存一档；不是 Git 仓库的目录会自动 `git init`（并写一个默认 `.gitignore`）。自动存档会跳过 `node_modules`、`.venv`、`__pycache__`、`.env*` 和 `shaniu.config.json`。不想自动提交就把 `git.autoCommit` 设成 `false`。
+兜底靠 Git：每一轮开工前把你没提交的改动先存一档，完工后再存一档；不是 Git 仓库的目录会自动 `git init`（并写一个默认 `.gitignore`）。自动存档会跳过 `node_modules`、`.venv`、`__pycache__`、`.env*` 和 `niuma.config.json`。不想自动提交就把 `git.autoCommit` 设成 `false`。
 
-网页默认只监听本机（`127.0.0.1`），拒绝其他网站发来的请求。想用手机看直播：`node bin/shaniu.js --host 0.0.0.0`，终端会打印一个带访问口令的局域网地址。
+网页默认只监听本机（`127.0.0.1`），拒绝其他网站发来的请求。想用手机看直播：`node bin/niuma.js --host 0.0.0.0`，终端会打印一个带访问口令的局域网地址。
 
 ## 配置
 
-配置按这个顺序叠加，后面的覆盖前面的：内置默认值 → `~/.shaniu/config.json` → `项目目录/shaniu.config.json` → `--config 指定的文件` → 命令行参数。`groups` 和 `employees` 按 `id` 合并：同一个 id 是修改，新 id 是新增。可以从 [`shaniu.config.example.json`](shaniu.config.example.json) 复制一份改。
+配置按这个顺序叠加，后面的覆盖前面的：内置默认值 → `~/.niuma/config.json` → `项目目录/niuma.config.json` → `--config 指定的文件` → 命令行参数。`groups` 和 `employees` 按 `id` 合并：同一个 id 是修改，新 id 是新增。可以从 [`niuma.config.example.json`](niuma.config.example.json) 复制一份改。
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
@@ -174,8 +174,8 @@ look: glasses
 | `dispatchDelayMs` | `1500` | 派活前的停顿（傻妞走过去送任务单的时间） |
 | `taskTimeoutMin` | `30` | 单个任务超时（分钟） |
 | `historyRounds` | `6` | 傻妞记住最近几轮对话 |
-| `logDir` | `~/.shaniu/logs` | 每次调用的完整提示词和原始输出 |
-| `statsFile` | `~/.shaniu/stats.json` | 员工战绩，派活时会参考 |
+| `logDir` | `~/.niuma/logs` | 每次调用的完整提示词和原始输出 |
+| `statsFile` | `~/.niuma/stats.json` | 员工战绩，派活时会参考 |
 
 ## 常见问题
 
@@ -187,12 +187,12 @@ look: glasses
 
 **两个人同时改会冲突吗？** 傻妞只让改不同文件的任务并行，并在交代里写明各自负责哪些文件。不放心就用 `--serial`。
 
-**哪里看细节？** 任务板里展开任务；更完整的记录在 `~/.shaniu/logs`。
+**哪里看细节？** 任务板里展开任务；更完整的记录在 `~/.niuma/logs`。
 
 ## 项目结构
 
 ```
-bin/shaniu.js         命令行入口
+bin/niuma.js         命令行入口
 src/coordinator.js    调度核心：规划、开会、派活、审查返工、验收迭代、换人、存档、招人
 src/team.js           项目组和员工的组装
 src/models.js         傻妞对各个模型的了解（能力、价位、擅长什么）
