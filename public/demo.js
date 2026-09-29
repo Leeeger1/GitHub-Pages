@@ -143,24 +143,26 @@ src/
     }
 
     async function meeting(my) {
+      // Recordings slow the meeting down so a voice-over can describe it while it happens.
+      const pace = window.NIUMA_MEETING_PACE || 1
       const attendees = ['architect', 'frontend', 'backend']
       const m = { topics: ['技术框架', '目录结构', '数据库和表设计'], attendees, speeches: [], minutes: '', file: '', status: 'open' }
       emit({ type: 'meeting', meeting: { ...m } })
       msg('system', `项目会议开始 · 议题：${m.topics.join('、')} · 参会：${attendees.map(name).join('、')}`)
       agent('shaniu', { status: 'meeting', text: '主持会议' })
       for (const id of attendees) agent(id, { status: 'meeting', text: '去会议室' })
-      await wait(2600)
+      await wait(2600 * pace)
       for (const id of attendees) {
         if (my !== epoch) return
         agent(id, { status: 'meeting', text: '想方案…' })
-        await wait(jitter(1400, 2200))
+        await wait(jitter(1400, 2200) * pace)
         if (my !== epoch) return
         m.speeches.push({ id, who: name(id), text: SPEECH[id] })
         msg('speech', SPEECH[id], { id, who: name(id) })
         agent(id, { status: 'meeting', text: SPEECH[id].slice(0, 22) + '…' })
       }
       agent('architect', { status: 'meeting', text: '整理会议纪要…' })
-      await wait(2200)
+      await wait(2200 * pace)
       if (my !== epoch) return
       Object.assign(m, { minutes: MINUTES, file: 'docs/meetings/2026-09-29-pocket-ledger.md', status: 'closed' })
       emit({ type: 'meeting', meeting: { ...m } })
