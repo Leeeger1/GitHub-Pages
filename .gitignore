@@ -1,0 +1,5 @@
+node_modules/
+.mavis/
+mavis.config.json
+*.log
+.DS_Store

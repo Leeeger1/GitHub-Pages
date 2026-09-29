@@ -1,0 +1,25 @@
+{
+  "name": "mavis-office",
+  "version": "0.1.0",
+  "description": "Mavis：你只跟她说话，她把任务拆好分给 Claude Code 和 Codex，并在像素办公室里直播它们干活。",
+  "type": "module",
+  "bin": {
+    "mavis": "bin/mavis.js"
+  },
+  "scripts": {
+    "start": "node bin/mavis.js",
+    "rehearsal": "node bin/mavis.js --fake",
+    "test": "node --test"
+  },
+  "files": [
+    "bin",
+    "src",
+    "public",
+    "fake",
+    "mavis.config.example.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
