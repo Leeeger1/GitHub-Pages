@@ -41,6 +41,17 @@
 
 ## 快速开始
 
+最省事：一行装好，之后在任何目录都能敲 `niuma`（需要 Node 18+ 和 Git）。
+
+```bash
+npm install -g github:Leeeger1/niuma-studio
+
+niuma --fake                 # 先彩排，不花钱、不改文件
+niuma D:\code\my-project     # 真干活，传项目目录（空文件夹也行）
+```
+
+也可以克隆下来直接跑：
+
 ```bash
 git clone https://github.com/Leeeger1/niuma-studio.git
 cd niuma-studio
@@ -53,7 +64,7 @@ node bin/niuma.js ~/code/my-project
 # Windows：node bin\niuma.js D:\code\my-project
 ```
 
-浏览器会自动打开 `http://localhost:7777`。想在任何目录直接敲 `niuma`，在仓库目录里运行一次 `npm link`。
+浏览器会自动打开 `http://localhost:7777`。克隆的方式想在任何目录直接敲 `niuma`，在仓库目录里运行一次 `npm link`。更新到最新版：再跑一遍 `npm install -g github:Leeeger1/niuma-studio`。
 
 ## 公司架构
 
