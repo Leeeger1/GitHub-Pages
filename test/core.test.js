@@ -34,7 +34,7 @@ test('extractJson / parseVerdict / extractVerdict', () => {
 
 test('config merges groups and employees by id', () => {
   const cfg = merge(DEFAULTS, {
-    groups: [{ id: 'deepseek', type: 'openai-api', model: 'deepseek-chat' }, { id: 'codex', enabled: false }],
+    groups: [{ id: 'deepseek', type: 'openai-api', model: 'deepseek-v4-flash' }, { id: 'codex', enabled: false }],
     employees: [{ id: 'frontend', group: 'deepseek' }],
   })
   assert.deepEqual(cfg.groups.map((g) => g.id), ['claude', 'codex', 'deepseek'])
@@ -46,12 +46,13 @@ test('config merges groups and employees by id', () => {
 test('model knowledge: tiers, costs and difficulty fit', () => {
   assert.equal(modelProfile({ model: 'opus' }).tier, 'strong')
   assert.equal(modelProfile({ model: 'claude-haiku-4-5' }).cost, 'low')
-  assert.equal(modelProfile({ model: 'deepseek-chat' }).tier, 'balanced')
-  assert.equal(modelProfile({ model: 'deepseek-reasoner' }).tier, 'strong')
+  assert.equal(modelProfile({ model: 'deepseek-v4-flash' }).tier, 'balanced')
+  assert.equal(modelProfile({ model: 'deepseek-v4-pro' }).tier, 'strong')
+  assert.equal(modelProfile({ model: 'glm-5.2' }).tier, 'strong')
   assert.equal(modelProfile({ type: 'codex-cli' }).tier, 'strong')
   assert.equal(modelProfile({ model: 'x', tier: 'fast', strengths: '自定义' }).strengths, '自定义')
   const opus = modelProfile({ model: 'opus' })
-  const cheap = modelProfile({ model: 'deepseek-chat' })
+  const cheap = modelProfile({ model: 'deepseek-v4-flash' })
   assert.ok(fitScore(opus, 'hard') > fitScore(cheap, 'hard'))
   assert.ok(fitScore(cheap, 'easy') > fitScore(opus, 'easy'))
 })
@@ -65,7 +66,7 @@ test('skills parse, and a skill file with a group becomes an employee', () => {
   const work = tmp()
   fs.mkdirSync(path.join(work, '.niuma', 'skills', 'sql'), { recursive: true })
   fs.writeFileSync(path.join(work, '.niuma', 'skills', 'sql', 'SKILL.md'), '---\nname: SQL 专家\ndescription: 写查询\ngroup: codex\n---\n规则')
-  const cfg = merge(DEFAULTS, { groups: [{ id: 'deepseek', type: 'openai-api', model: 'deepseek-chat' }] })
+  const cfg = merge(DEFAULTS, { groups: [{ id: 'deepseek', type: 'openai-api', model: 'deepseek-v4-flash' }] })
   const team = new Team(cfg, { root, workdir: work, logDir: work })
   assert.ok(team.employee('sql'), 'skill folder hired as an employee')
   assert.equal(team.employee('sql').group, 'codex')
@@ -75,7 +76,7 @@ test('skills parse, and a skill file with a group becomes an employee', () => {
 })
 
 function fakeTeam() {
-  const cfg = merge(DEFAULTS, { groups: [{ id: 'deepseek', type: 'openai-api', model: 'deepseek-chat' }] })
+  const cfg = merge(DEFAULTS, { groups: [{ id: 'deepseek', type: 'openai-api', model: 'deepseek-v4-flash' }] })
   const team = new Team(cfg, { root, workdir: root, logDir: tmp() })
   for (const g of team.groups.values()) g.available = true
   return team
@@ -193,7 +194,7 @@ test('a vague request is planned, routed by difficulty, reviewed and accepted', 
   assert.ok(c.tasks.every((t) => t.status === 'done'), JSON.stringify(c.tasks.map((t) => [t.id, t.status, t.error])))
   assert.equal(byId.t1.model, 'opus', 'hard task uses the strong model of the Claude group')
   assert.equal(byId.t2.model, 'sonnet')
-  assert.equal(byId.t4.model, 'deepseek-chat', 'easy docs go to the cheap API group')
+  assert.equal(byId.t4.model, 'deepseek-v4-flash', 'easy docs go to the cheap API group')
   assert.ok(byId.t4.activity.some((a) => a.text.startsWith('看目录')), 'built-in API agent really ran its tools')
   assert.equal(byId.t5.verdict, 'approve')
   assert.equal(byId.v1.verdict, 'approve')

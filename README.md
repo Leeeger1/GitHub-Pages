@@ -4,7 +4,9 @@
 
 工作室按**项目组**编排，每个项目组就是一种 AI 模型：Claude Code、Codex、DeepSeek、中转站 API……组里坐着各有技能的**员工**，每个员工就是一个 skill 文件。所有人在一间像素办公室里上班：谁在读哪个文件、跑什么命令，头顶气泡里都看得到；开会时大家走到会议桌边发言；派活时傻妞会起身把任务单送到工位上。
 
-![牛马工作室](docs/screenshot.png)
+![牛马工作室演示](docs/demo.gif)
+
+完整演示视频（1 分 50 秒，带字幕）：[docs/niuma-demo.mp4](docs/niuma-demo.mp4)
 
 ## 一个需求是怎么被做完的
 
@@ -16,6 +18,16 @@
 6. **验收**：全部做完后，验收员对照你的原始需求实际检查，能跑的都跑一遍。没做完就列出问题，傻妞自动安排下一轮，最多 3 轮。
 7. **兜底**：有人失败（额度用完、报错、超时），傻妞把任务换给别的员工接手。
 8. **存档**：每一轮开工前、完工后都自动 `git commit`，说一句「/撤销」就能撤回整轮改动。
+
+## 亮点
+
+- **说句模糊的话就行**：傻妞自己补全细节、不反问，干完自己验收，没做完自动再来一轮。
+- **开项目会**：新项目先讨论框架、目录和数据库，纪要存进项目，所有人照着做。
+- **按难度派活**：难题给强模型，杂活给便宜模型，同一个组也会按难度切换型号。
+- **什么模型都能当员工**：Claude Code、Codex、DeepSeek、通义、Kimi、智谱、中转站、本地模型……见 [接入 API 指南](docs/api-guide.md)。
+- **skill 就是员工**：写一个 Markdown 岗位说明就多一名员工，或者让傻妞 `/招人`。
+- **放心全自动**：每轮自动 git 存档，一句 `/撤销` 撤回；危险命令一律拦截。
+- **零依赖**：只要 Node 18+，不用 `npm install`。
 
 ## 准备
 
@@ -30,8 +42,8 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/Leeeger1/GitHub-Pages.git niuma
-cd niuma
+git clone https://github.com/Leeeger1/niuma-studio.git
+cd niuma-studio
 
 # 先彩排：用替身员工演一遍完整流程，不花钱、不改文件
 node bin/niuma.js --fake
@@ -53,7 +65,7 @@ node bin/niuma.js ~/code/my-project
 | `codex-cli` | Codex 命令行 | 装好 `codex` 即可 |
 | `openai-api` | 任意 OpenAI 兼容接口。傻妞内置了一个编程员工，会列目录、读写文件、精确替换、搜索、跑命令 | 填 `baseUrl`、`apiKey`（或 `apiKeyEnv`）和模型名 |
 
-默认有 Claude 组和 Codex 组。在配置里加项目组就是多一片工位，比如接 DeepSeek 和中转站：
+默认有 Claude 组和 Codex 组。在配置里加项目组就是多一片工位。**详细的接入方法（DeepSeek、中转站、通义、Kimi、智谱、硅基流动、OpenRouter、本地模型，以及怎么让 Claude Code 走中转）见 [接入 API 指南](docs/api-guide.md)。**简单的例子：
 
 ```json
 {
@@ -64,7 +76,7 @@ node bin/niuma.js ~/code/my-project
       "type": "openai-api",
       "baseUrl": "https://api.deepseek.com",
       "apiKeyEnv": "DEEPSEEK_API_KEY",
-      "models": { "hard": "deepseek-reasoner", "medium": "deepseek-chat", "easy": "deepseek-chat" }
+      "models": { "hard": "deepseek-v4-pro", "medium": "deepseek-v4-flash", "easy": "deepseek-v4-flash" }
     },
     {
       "id": "relay",
@@ -188,6 +200,10 @@ look: glasses
 **两个人同时改会冲突吗？** 傻妞只让改不同文件的任务并行，并在交代里写明各自负责哪些文件。不放心就用 `--serial`。
 
 **哪里看细节？** 任务板里展开任务；更完整的记录在 `~/.niuma/logs`。
+
+## 许可证
+
+[MIT](LICENSE)。欢迎提 Issue 和 PR：新岗位 skill、新平台的接入经验、像素小人的新造型都很欢迎。
 
 ## 项目结构
 

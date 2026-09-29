@@ -13,7 +13,7 @@
       "type": "openai-api",
       "baseUrl": "https://api.deepseek.com",
       "apiKeyEnv": "DEEPSEEK_API_KEY",
-      "models": { "hard": "deepseek-reasoner", "medium": "deepseek-chat", "easy": "deepseek-chat" }
+      "models": { "hard": "deepseek-v4-pro", "medium": "deepseek-v4-flash", "easy": "deepseek-v4-flash" }
     },
     {
       "id": "relay",

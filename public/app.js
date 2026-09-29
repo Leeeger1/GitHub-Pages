@@ -266,7 +266,8 @@
   function renderBanner() {
     const el = $('#banner')
     if (state.mode === 'demo') {
-      el.innerHTML = '这是演示：员工都是演员，不会真的改代码。在电脑上运行 <code>node bin/niuma.js 你的项目目录</code>，他们就会真的开工。'
+      el.innerHTML =
+        '这是演示：员工都是演员，不会真的改代码。项目开源在 <a href="https://github.com/Leeeger1/niuma-studio" target="_blank" rel="noopener">GitHub</a>，下载后运行 <code>node bin/niuma.js 你的项目目录</code>，他们就会真的开工。'
       el.hidden = false
     } else if (state.mode === 'fake') {
       el.innerHTML = '彩排模式：员工都是替身，不花钱、不改文件。去掉 <code>--fake</code> 就是真干活。'

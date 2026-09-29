@@ -35,7 +35,7 @@ test('the built-in API agent loops through tool calls against an OpenAI-compatib
   const api = await startFakeOpenAI()
   const dir = tmp()
   fs.writeFileSync(path.join(dir, 'index.js'), 'function main() {}\n')
-  const w = new OpenAIWorker({ id: 'deepseek', type: 'openai-api', baseUrl: api.url, apiKey: 'k', model: 'deepseek-chat' }, { workdir: dir, logDir: dir })
+  const w = new OpenAIWorker({ id: 'deepseek', type: 'openai-api', baseUrl: api.url, apiKey: 'k', model: 'deepseek-v4-flash' }, { workdir: dir, logDir: dir })
   assert.equal(await w.check(), true)
   const acts = []
   const res = await w.run({ prompt: '## 你的任务 [t1] 写使用说明\n写 README', onActivity: (a) => acts.push(a.text) })

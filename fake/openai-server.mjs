@@ -29,7 +29,7 @@ export function startFakeOpenAI(port = 0) {
   const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url.endsWith('/models')) {
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      return res.end(JSON.stringify({ data: [{ id: 'deepseek-chat' }, { id: 'qwen3-coder' }] }))
+      return res.end(JSON.stringify({ data: [{ id: 'deepseek-v4-flash' }, { id: 'deepseek-v4-pro' }, { id: 'qwen3-coder' }] }))
     }
     let raw = ''
     for await (const c of req) raw += c

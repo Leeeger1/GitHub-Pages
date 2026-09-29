@@ -17,7 +17,7 @@ export async function rehearsalConfig(config, root) {
       groups: [
         { id: 'claude', name: 'Claude 组', type: 'claude-cli', command: node('claude.mjs'), color: '#c4602f', models: { hard: 'opus', medium: 'sonnet', easy: 'haiku' } },
         { id: 'codex', name: 'Codex 组', type: 'codex-cli', command: node('codex.mjs'), color: '#16837a' },
-        { id: 'deepseek', name: 'DeepSeek 组', type: 'openai-api', baseUrl: api.url, apiKey: 'rehearsal', models: { hard: 'deepseek-reasoner', medium: 'deepseek-chat', easy: 'deepseek-chat' } },
+        { id: 'deepseek', name: 'DeepSeek 组', type: 'openai-api', baseUrl: api.url, apiKey: 'rehearsal', models: { hard: 'deepseek-v4-pro', medium: 'deepseek-v4-flash', easy: 'deepseek-v4-flash' } },
         { id: 'qwen', name: 'Qwen 组', type: 'openai-api', baseUrl: api.url, apiKey: 'rehearsal', model: 'qwen3-coder' },
       ],
       employees: [...config.employees.filter((e) => ['claude', 'codex'].includes(e.group)), { id: 'writer', skill: 'writer', group: 'deepseek' }],

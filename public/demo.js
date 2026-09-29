@@ -9,7 +9,7 @@
   const GROUPS = [
     { id: 'claude', name: 'Claude 组', type: 'claude-cli', typeLabel: 'Claude Code', color: '#c4602f', models: { hard: 'opus', medium: 'sonnet', easy: 'haiku' } },
     { id: 'codex', name: 'Codex 组', type: 'codex-cli', typeLabel: 'Codex', color: '#16837a', models: { hard: '', medium: '', easy: '' } },
-    { id: 'deepseek', name: 'DeepSeek 组', type: 'openai-api', typeLabel: 'API', color: '#4d6bfe', models: { hard: 'deepseek-reasoner', medium: 'deepseek-chat', easy: 'deepseek-chat' } },
+    { id: 'deepseek', name: 'DeepSeek 组', type: 'openai-api', typeLabel: 'API', color: '#4d6bfe', models: { hard: 'deepseek-v4-pro', medium: 'deepseek-v4-flash', easy: 'deepseek-v4-flash' } },
     { id: 'qwen', name: 'Qwen 组', type: 'openai-api', typeLabel: 'API · 中转站', color: '#7a52e0', models: { hard: 'qwen3-coder', medium: 'qwen3-coder', easy: 'qwen3-coder' } },
   ]
   const PEOPLE = [
@@ -293,9 +293,12 @@ src/
       drain()
     }
 
-    setTimeout(() => {
-      if (!busy && round === 0) post('帮我做一个记账小网站')
-    }, 900)
+    // Recording scripts set window.NIUMA_NO_AUTOPLAY to type the first request themselves.
+    if (!window.NIUMA_NO_AUTOPLAY) {
+      setTimeout(() => {
+        if (!busy && round === 0) post('帮我做一个记账小网站')
+      }, 900)
+    }
 
     return { send: async (text) => post(text), stop: async () => stop() }
   }
