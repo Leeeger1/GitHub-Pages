@@ -4,6 +4,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { SAFE_COMMANDS } from '../config.js'
+import { McpClient, mcpResult } from '../mcp/client.js'
+import { describeMcpCall } from '../tools.js'
 import { SKIP_DIRS, fillEnv, firstLine, runShell, sleep, truncate, killTree } from '../util.js'
 import { BaseWorker } from './base.js'
 
@@ -197,9 +199,22 @@ export class Toolbox {
   }
 }
 
-function systemPrompt({ workdir, readOnly }) {
+/** OpenAI function names allow [A-Za-z0-9_-]{1,64}. */
+function fnName(server, tool) {
+  return `${server}__${tool}`.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64)
+}
+
+/** Some OpenAI-compatible servers reject JSON Schema keywords they don't know; keep the common subset. */
+function plainSchema(schema) {
+  if (!schema || typeof schema !== 'object') return { type: 'object', properties: {} }
+  const { $schema, $id, $defs, definitions, ...rest } = schema
+  return rest.type ? rest : { type: 'object', properties: {}, ...rest }
+}
+
+function systemPrompt({ workdir, readOnly, plugins = [] }) {
+  const extra = plugins.length ? `\n另外你还有这些插件：${plugins.join('、')}（函数名以插件名开头）。` : ''
   return `你是一名软件工程师，在牛马工作室里干活。
-工作目录：${workdir}（${os.platform()}）。你只能通过工具读写这个目录里的文件、运行命令。
+工作目录：${workdir}（${os.platform()}）。你只能通过工具读写这个目录里的文件、运行命令。${extra}
 做事方式：
 - 先了解再动手：用 list_files、search、read_file 看清楚。
 - 小改动用 edit_file，新文件或整体重写用 write_file。
@@ -222,6 +237,7 @@ export class OpenAIWorker extends BaseWorker {
     super(group, ctx)
     this.aborts = new Set()
     this.children = new Set()
+    this.plugins = new Set()
   }
 
   apiKey() {
@@ -261,10 +277,38 @@ export class OpenAIWorker extends BaseWorker {
   stopAll() {
     for (const a of this.aborts) a.abort()
     for (const c of this.children) killTree(c)
+    for (const p of this.plugins) p.close()
+  }
+
+  /** Start the plugins handed out for this task and turn their tools into functions for the model. */
+  async startPlugins(tools, onActivity) {
+    const routes = new Map()
+    const functions = []
+    const clients = []
+    const names = []
+    for (const t of tools) {
+      if (!t.command) continue
+      const client = new McpClient(t.server, { command: t.command, args: t.args || [], env: t.env || {}, cwd: this.workdir })
+      clients.push(client)
+      this.plugins.add(client)
+      onActivity({ kind: 'tool', text: `准备${t.name}` })
+      try {
+        for (const mt of await client.start()) {
+          const name = fnName(t.server, mt.name)
+          routes.set(name, { client, server: t.server, tool: mt.name })
+          functions.push({ type: 'function', function: { name, description: truncate(mt.description || mt.name, 1000), parameters: plainSchema(mt.inputSchema) } })
+        }
+        names.push(t.name)
+      } catch (e) {
+        onActivity({ kind: 'warn', text: `${t.name}没启动起来：${truncate(e.message, 60)}` })
+        client.close()
+      }
+    }
+    return { routes, functions, clients, names }
   }
 
   async chat(messages, { tools, model, signal }) {
-    const body = { model, messages }
+    const body = { model, messages: messages.map(({ screenshot, ...m }) => m) }
     if (tools) Object.assign(body, { tools, tool_choice: 'auto' })
     if (this.cfg.temperature != null) body.temperature = this.cfg.temperature
     if (this.cfg.maxTokens) body.max_tokens = this.cfg.maxTokens
@@ -304,7 +348,7 @@ export class OpenAIWorker extends BaseWorker {
     return ((usage.in || 0) * (p.input || 0) + (usage.out || 0) * (p.output || 0)) / 1e6
   }
 
-  async run({ prompt, model, readOnly = false, onActivity = () => {}, timeoutMs = 30 * 60 * 1000, label = 'task' }) {
+  async run({ prompt, model, readOnly = false, onActivity = () => {}, timeoutMs = 30 * 60 * 1000, label = 'task', tools: plugins = [] }) {
     model = model || this.modelFor('medium')
     const log = this.openLog(label, prompt)
     const started = Date.now()
@@ -319,17 +363,22 @@ export class OpenAIWorker extends BaseWorker {
         child.on('close', () => this.children.delete(child))
       },
     })
-    const tools = TOOLS.filter((t) => !(readOnly && WRITE_TOOLS.has(t.function.name)))
+    const kit = await this.startPlugins(plugins, onActivity)
+    const tools = [...TOOLS.filter((t) => !(readOnly && WRITE_TOOLS.has(t.function.name))), ...kit.functions]
     const messages = [
-      { role: 'system', content: systemPrompt({ workdir: this.workdir, readOnly }) },
+      { role: 'system', content: systemPrompt({ workdir: this.workdir, readOnly, plugins: kit.names }) },
       { role: 'user', content: prompt },
     ]
     const usage = { in: 0, out: 0 }
     let lastText = ''
-    const maxSteps = this.cfg.maxSteps || 60
+    const maxSteps = this.cfg.maxSteps || (kit.functions.length ? 120 : 60)
     const finish = (res) => {
       clearTimeout(timer)
       this.aborts.delete(ac)
+      for (const c of kit.clients) {
+        c.close()
+        this.plugins.delete(c)
+      }
       res.durationMs = Date.now() - started
       res.usage = usage
       res.cost = this.cost(usage)
@@ -349,6 +398,7 @@ export class OpenAIWorker extends BaseWorker {
         messages.push({ role: 'assistant', content: message.content ?? null, ...(calls.length ? { tool_calls: calls } : {}) })
         if (!calls.length) return finish({ ok: true, text: lastText })
         if (text) onActivity({ kind: 'say', text: firstLine(text) })
+        const images = []
         for (const call of calls) {
           const name = call.function?.name
           let args = null
@@ -356,13 +406,33 @@ export class OpenAIWorker extends BaseWorker {
             args = JSON.parse(call.function?.arguments || '{}')
           } catch {}
           let out
+          const route = kit.routes.get(name)
           if (!args) out = '错误：参数不是合法的 JSON（可能输出太长被截断了）。大文件请分几次写。'
-          else {
+          else if (route) {
+            onActivity({ kind: 'tool', text: describeMcpCall(route.server, route.tool, args) })
+            try {
+              const r = mcpResult(await route.client.call(route.tool, args))
+              out = clip(r.text, 30000)
+              if (r.images.length && this.cfg.vision) images.push(...r.images)
+              else if (r.images.length) out += '\n（插件返回了截图，但这个模型看不了图片）'
+            } catch (e) {
+              out = `错误：${e.message}`
+            }
+          } else {
             onActivity({ kind: 'tool', text: describeTool(name, args) })
             out = await box.exec(name, args)
           }
           log?.write(`[tool ${name}] ${truncate(JSON.stringify(args), 300)}\n${truncate(out, 600)}\n`)
           messages.push({ role: 'tool', tool_call_id: call.id, content: out })
+        }
+        if (images.length) {
+          // Only the newest screenshots stay in the conversation; older ones are replaced by a note.
+          for (const m of messages) if (m.screenshot) Object.assign(m, { content: '（旧截图已省略）', screenshot: undefined })
+          messages.push({
+            role: 'user',
+            screenshot: true,
+            content: [{ type: 'text', text: '这是刚才工具返回的截图：' }, ...images.slice(-2).map((im) => ({ type: 'image_url', image_url: { url: `data:${im.mimeType};base64,${im.data}` } }))],
+          })
         }
       }
       return finish({ ok: false, text: lastText, error: `用完 ${maxSteps} 步还没做完` })

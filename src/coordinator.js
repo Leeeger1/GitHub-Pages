@@ -16,6 +16,7 @@ import {
   retryPrompt,
   summaryPrompt,
   taskPrompt,
+  toolGuide,
   verifyPrompt,
 } from './prompts.js'
 import { skillId, writeSkill } from './skills.js'
@@ -37,6 +38,7 @@ export function parseCommand(text, team) {
     if (['help', '帮助'].includes(c)) return { type: 'help' }
     if (['undo', '撤销'].includes(c)) return { type: 'undo' }
     if (['team', '团队'].includes(c)) return { type: 'team' }
+    if (['tools', '工具', '插件', '工具柜'].includes(c)) return { type: 'tools' }
     if (['hire', '招人', '招聘'].includes(c)) return rest ? { type: 'hire', text: rest } : { type: 'help' }
     const e = team?.resolve(c)
     if (e) return rest ? { type: 'direct', agent: e.id, text: rest } : { type: 'help' }
@@ -93,6 +95,7 @@ function makeTask(t) {
     difficulty: 'medium',
     why: '',
     iter: 1,
+    tools: [],
     ...t,
   }
 }
@@ -100,10 +103,11 @@ function makeTask(t) {
 const publicTask = (t) => ({ ...t, basePrompt: undefined, activity: t.activity.slice(-40) })
 
 /** Best available employee for a task, judged by skill fit, model tier vs difficulty, record and load. */
-export function pickEmployee(team, { difficulty = 'medium', kind = 'code', exclude = [], load = {}, stats = {} } = {}) {
+export function pickEmployee(team, { difficulty = 'medium', kind = 'code', exclude = [], load = {}, stats = {}, tools = [] } = {}) {
   let best = null
   for (const e of team.employees) {
     if (exclude.includes(e.id) || !team.isAvailable(e.id)) continue
+    if (tools.length && team.canUse && !team.canUse(e.id, tools)) continue
     const g = team.groups.get(e.group)
     let score = fitScore(g.profileFor(difficulty), difficulty)
     if ((kind === 'review' || kind === 'verify') && e.skill.id === 'reviewer') score += 15
@@ -128,10 +132,16 @@ export function normalizeTasks(raw, team, { stats = {}, taken = new Set(), iter 
     const kind = ['code', 'review', 'research'].includes(t.kind) ? t.kind : 'code'
     let emp = team.resolve(t.agent)
     let why = String(t.why || '').trim()
-    if (!emp || !team.isAvailable(emp.id)) {
-      const id = pickEmployee(team, { difficulty, kind, load, stats })
+    // Only keep tools that some employee on duty can actually use.
+    let tools = team.tools ? team.tools.resolve(t.tools).filter((x) => team.employees.some((e) => team.isAvailable(e.id) && team.canUse(e.id, [x]))) : []
+    if (!emp || !team.isAvailable(emp.id) || (tools.length && !team.canUse(emp.id, tools))) {
+      let id = pickEmployee(team, { difficulty, kind, load, stats, tools })
+      if (!id) {
+        id = pickEmployee(team, { difficulty, kind, load, stats })
+        if (id) tools = tools.filter((x) => team.canUse(id, [x]))
+      }
       if (!id) return
-      if (emp) why = `${emp.name}不在岗，改派`
+      if (emp) why = team.isAvailable(emp.id) ? `${emp.name}用不了需要的工具，改派` : `${emp.name}不在岗，改派`
       emp = team.employee(id)
     }
     load[emp.id] = (load[emp.id] || 0) + 1
@@ -151,6 +161,7 @@ export function normalizeTasks(raw, team, { stats = {}, taken = new Set(), iter 
         iter,
         deps: (Array.isArray(deps) ? deps : [deps]).map(String),
         prompt: String(t.prompt || t.title || '').trim(),
+        tools,
       }),
     )
   })
@@ -196,6 +207,7 @@ export class Coordinator extends EventEmitter {
     this.meeting = null
     this.minutes = ''
     this.stats = this.loadStats()
+    this.toolsIntroduced = new Set()
   }
 
   // ---- setup ---------------------------------------------------------------
@@ -376,6 +388,7 @@ export class Coordinator extends EventEmitter {
       return this.addMessage('shaniu', '好哒，之前聊的傻妞先放下了，我们重新开始～')
     }
     if (cmd?.type === 'team') return this.addMessage('shaniu', this.teamMessage())
+    if (cmd?.type === 'tools') return this.addMessage('shaniu', this.toolsMessage())
     if (cmd?.type === 'undo') return this.undo()
     if (cmd?.type === 'hire') return this.hire(cmd.text)
 
@@ -385,7 +398,7 @@ export class Coordinator extends EventEmitter {
       if (!this.team.isAvailable(e.id)) return this.addMessage('shaniu', `${e.name}今天不在岗，派不了哦。`)
       plan = {
         reply: `好的，这件事直接交给${e.name}！`,
-        tasks: [{ id: 't1', title: truncate(cmd.text, 24), agent: e.id, difficulty: 'medium', why: '主人点名', kind: 'code', prompt: cmd.text }],
+        tasks: [{ id: 't1', title: truncate(cmd.text, 24), agent: e.id, difficulty: 'medium', why: '主人点名', kind: 'code', prompt: cmd.text, tools: this.team.tools.guess(cmd.text) }],
         direct: true,
       }
     } else {
@@ -492,6 +505,8 @@ export class Coordinator extends EventEmitter {
         const g = this.team.groupOf(t.agent)
         if ((perGroup.get(g.id) || 0) >= cap(g)) continue
         if (!t.deps.every((d) => this.task(d)?.status === 'done')) continue
+        // Two employees driving the same mouse would fight: one desktop task at a time.
+        if (t.tools.includes('desktop') && [...running.keys()].some((id) => this.task(id)?.tools.includes('desktop'))) continue
         busyEmp.add(t.agent)
         perGroup.set(g.id, (perGroup.get(g.id) || 0) + 1)
         await this.dispatch(t)
@@ -548,12 +563,14 @@ export class Coordinator extends EventEmitter {
     const emp = this.team.employee(t.agent)
     const g = this.team.groups.get(emp.group)
     t.model = g.modelFor(t.difficulty)
+    const tools = this.toolsFor(t, g)
+    this.introduceTools(t, tools)
     Object.assign(t, { status: 'running', startedAt: Date.now(), endedAt: null, error: '' })
     this.emitTask(t)
     this.setAgent(t.agent, { status: 'working', text: t.title, taskId: t.id })
     const prompt =
       t.kind === 'verify'
-        ? t.prompt
+        ? t.prompt + toolGuide(tools)
         : taskPrompt({
             task: t,
             employee: emp,
@@ -564,6 +581,7 @@ export class Coordinator extends EventEmitter {
             parallel: this.config.parallel,
             depResults: t.deps.map((d) => this.task(d)).filter(Boolean),
             minutes: this.minutes,
+            tools,
           })
     const timeoutMin = this.config.taskTimeoutMin || 30
     let res
@@ -575,6 +593,7 @@ export class Coordinator extends EventEmitter {
         timeoutMs: (t.kind === 'verify' ? Math.min(timeoutMin, 15) : timeoutMin) * 60 * 1000,
         label: `r${this.round}-${t.id}`,
         onActivity: (a) => this.onActivity(t, a),
+        tools,
       })
     } catch (e) {
       res = { ok: false, text: '', error: e.message }
@@ -608,7 +627,7 @@ export class Coordinator extends EventEmitter {
     const load = {}
     for (const x of this.tasks) if (x.status === 'running') load[x.agent] = (load[x.agent] || 0) + 1
     const exclude = [t.agent, ...t.attempts.map((a) => a.agent)]
-    const next = pickEmployee(this.team, { difficulty: t.difficulty, kind: t.kind, exclude, load, stats: this.stats })
+    const next = pickEmployee(this.team, { difficulty: t.difficulty, kind: t.kind, exclude, load, stats: this.stats, tools: t.tools })
     if (!next) return false
     t.attempts.push(prev)
     const emp = this.team.employee(next)
@@ -658,6 +677,7 @@ export class Coordinator extends EventEmitter {
       deps: [review.id],
       prompt: fixPrompt({ target, reviewer: review.who }),
       fixRound: round + 1,
+      tools: target.tools.filter((x) => this.team.canUse(author, [x])),
     })
     const recheck = makeTask({
       id: uniq(`${review.id}-re${round + 1}`),
@@ -671,6 +691,7 @@ export class Coordinator extends EventEmitter {
       deps: [fix.id],
       prompt: rereviewPrompt({ target, fixer: fix.who, round }),
       fixRound: round + 1,
+      tools: review.tools,
     })
     for (const t of this.tasks) if (t.status === 'pending') t.deps = t.deps.map((d) => (d === review.id ? recheck.id : d))
     this.tasks.splice(this.tasks.indexOf(review) + 1, 0, fix, recheck)
@@ -803,8 +824,11 @@ export class Coordinator extends EventEmitter {
     const who = this.verifier()
     if (!who) return { done: true, problems: [], tasks: [] }
     const emp = this.team.employee(who)
+    // If this round built or tested web pages in a browser, the checker gets one too.
+    const tools = this.tasks.some((x) => x.tools.includes('browser')) && this.team.canUse(who, ['browser']) ? ['browser'] : []
     const t = makeTask({
       id: `v${this.iteration}`,
+      tools,
       title: `验收（第 ${this.iteration} 次）`,
       agent: who,
       who: emp.name,
@@ -915,6 +939,39 @@ export class Coordinator extends EventEmitter {
     } finally {
       this.setAgent('shaniu', { status: 'idle', text: '' })
     }
+  }
+
+  /** Tool specs for a run: what the plugin is, and how to start it when the worker doesn't load it itself. */
+  toolsFor(t, g) {
+    return t.tools
+      .map((id) => this.team.tools.get(id))
+      .filter((x) => x && this.team.tools.supports(g, x.id))
+      .map((x) => ({ ...x, ...(this.team.tools.spec(x.id) || {}) }))
+  }
+
+  introduceTools(t, tools) {
+    for (const x of tools) {
+      if (x.takesOver) {
+        this.addMessage('shaniu', `注意：${t.who}要接管电脑操作了（${t.title}）。这段时间屏幕上的鼠标会自己动，主人先别碰鼠标键盘哦～ 想叫停随时说 /stop`)
+        continue
+      }
+      if (this.toolsIntroduced.has(x.id)) continue
+      this.toolsIntroduced.add(x.id)
+      const download = x.source === 'builtin' && x.id === 'browser' ? '（第一次用会自动下载插件，稍等一小会儿）' : ''
+      this.addMessage('shaniu', `这个活要用${x.name}，傻妞给${t.who}配好啦～${download}`)
+    }
+  }
+
+  toolsMessage() {
+    const tools = this.team.tools.list()
+    if (!tools.length) return '工具柜现在是空的。'
+    const groups = [...this.team.groups.values()].filter((g) => g.available)
+    const lines = tools.map((x) => {
+      const who = groups.filter((g) => this.team.tools.supports(g, x.id)).map((g) => g.name)
+      const from = x.source === 'installed' ? '（主人自己装的）' : x.source === 'config' ? '（配置里加的）' : ''
+      return `- **${x.name}**${from}：${x.description}\n  能用的组：${who.length ? who.join('、') : '暂时没有'}`
+    })
+    return `工具柜里现在有这些插件。派活时需要哪个，傻妞会自动给员工配好，第一次用会自动下载：\n${lines.join('\n')}\n\n想加别的插件：装进 Claude Code（\`claude mcp add …\`）或 Codex，傻妞重启后会自动发现；也可以写进配置文件的 \`tools\` 里。`
   }
 
   teamMessage() {

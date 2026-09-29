@@ -44,6 +44,14 @@ export class BaseWorker {
     return Object.fromEntries(Object.entries(this.cfg.env || {}).map(([k, v]) => [k, fillEnv(String(v))]))
   }
 
+  /**
+   * Plugins this run has to start itself. Tools the CLI already loads from its own settings
+   * (the boss installed them there) only need to be allowed, not started again.
+   */
+  injected(tools = []) {
+    return tools.filter((t) => t.command && !(t.native || []).includes(this.type))
+  }
+
   tmpFile(label) {
     return path.join(os.tmpdir(), `niuma-${process.pid}-${Date.now()}-${this.id}-${label}.txt`)
   }

@@ -7,10 +7,10 @@
   const jitter = (a, b) => a + Math.random() * (b - a)
 
   const GROUPS = [
-    { id: 'claude', name: 'Claude 组', type: 'claude-cli', typeLabel: 'Claude Code', color: '#c4602f', models: { hard: 'opus', medium: 'sonnet', easy: 'haiku' } },
-    { id: 'codex', name: 'Codex 组', type: 'codex-cli', typeLabel: 'Codex', color: '#16837a', models: { hard: '', medium: '', easy: '' } },
-    { id: 'deepseek', name: 'DeepSeek 组', type: 'openai-api', typeLabel: 'API', color: '#4d6bfe', models: { hard: 'deepseek-v4-pro', medium: 'deepseek-v4-flash', easy: 'deepseek-v4-flash' } },
-    { id: 'qwen', name: 'Qwen 组', type: 'openai-api', typeLabel: 'API · 中转站', color: '#7a52e0', models: { hard: 'qwen3-coder', medium: 'qwen3-coder', easy: 'qwen3-coder' } },
+    { id: 'claude', name: 'Claude 组', type: 'claude-cli', typeLabel: 'Claude Code', color: '#c4602f', models: { hard: 'opus', medium: 'sonnet', easy: 'haiku' }, tools: ['浏览器', '电脑操作'] },
+    { id: 'codex', name: 'Codex 组', type: 'codex-cli', typeLabel: 'Codex', color: '#16837a', models: { hard: '', medium: '', easy: '' }, tools: ['浏览器'] },
+    { id: 'deepseek', name: 'DeepSeek 组', type: 'openai-api', typeLabel: 'API', color: '#4d6bfe', models: { hard: 'deepseek-v4-pro', medium: 'deepseek-v4-flash', easy: 'deepseek-v4-flash' }, tools: ['浏览器'] },
+    { id: 'qwen', name: 'Qwen 组', type: 'openai-api', typeLabel: 'API · 中转站', color: '#7a52e0', models: { hard: 'qwen3-coder', medium: 'qwen3-coder', easy: 'qwen3-coder' }, tools: ['浏览器'] },
   ]
   const PEOPLE = [
     ['architect', '架构师', 'claude', 'helmet', '设计整体方案、搭项目骨架、跨模块的大改动'],
@@ -29,7 +29,7 @@
     core: [['think', 'Planning store module'], ['tool', '写 src/store/records.js'], ['tool', '写 src/core/stats.js'], ['tool', '写 test/stats.test.js'], ['tool', '跑 npm test'], ['warn', '命令没跑通（退出码 1）'], ['tool', '改 src/core/stats.js'], ['tool', '跑 npm test']],
     docs: [['tool', '看目录 .'], ['tool', '读 package.json'], ['tool', '写 README.md']],
     review: [['tool', '跑 git diff --stat'], ['tool', '读 src/store/records.js'], ['tool', '读 src/ui/RecordList.js'], ['tool', '跑 npm test']],
-    verify: [['tool', '跑 git status --short'], ['tool', '跑 npm test'], ['tool', '跑 npm run build'], ['tool', '读 src/ui/RecordList.js']],
+    verify: [['tool', '跑 git status --short'], ['tool', '跑 npm test'], ['tool', '打开网页 dist/index.html'], ['tool', '点 删除按钮'], ['tool', '网页截图']],
     fix: [['tool', '搜 “deleteRecord”'], ['tool', '改 src/ui/RecordList.js'], ['tool', '跑 npm test']],
     generic: [['tool', '跑 git status --short'], ['tool', '搜 “TODO”'], ['tool', '读 src/index.js'], ['tool', '改 src/index.js'], ['tool', '跑 npm test']],
   }
@@ -197,6 +197,12 @@ src/
       if (/^\/(团队|team)/.test(t)) {
         const lines = GROUPS.flatMap((g) => [`**${g.name}**（在岗）`, ...roster.employees.filter((e) => e.group === g.id).map((e) => `- \`${e.id}\` ${e.name}：${e.description}`)])
         return msg('shaniu', lines.join('\n'))
+      }
+      if (/^\/(工具|tools|插件)/.test(t)) {
+        return msg(
+          'shaniu',
+          '工具柜里现在有这些插件。派活时需要哪个，傻妞会自动给员工配好，第一次用会自动下载：\n- **浏览器**：打开网页、点按钮、填表、截图\n  能用的组：Claude 组、Codex 组、DeepSeek 组、Qwen 组\n- **电脑操作**：看屏幕、点鼠标、打字、按快捷键、打开软件\n  能用的组：Claude 组\n\n想加别的插件：装进 Claude Code（`claude mcp add …`）或 Codex，傻妞重启后会自动发现。（演示模式）',
+        )
       }
       if (/^\/(撤销|undo)/.test(t)) {
         if (!lastCommit) return msg('shaniu', '没有可以撤销的存档哦。')

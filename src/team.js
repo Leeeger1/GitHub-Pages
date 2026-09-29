@@ -1,6 +1,7 @@
 // The company: project groups (项目组, one per model backend) and employees (员工, one per skill).
 import { COST_ZH, TIER_ZH } from './models.js'
 import { loadSkills, skillDirs } from './skills.js'
+import { ToolCatalog } from './tools.js'
 import { ClaudeCliWorker, CodexCliWorker } from './workers/cli.js'
 import { OpenAIWorker } from './workers/openai.js'
 
@@ -22,6 +23,7 @@ export class Team {
     this.root = root
     this.workdir = workdir
     this.logDir = logDir
+    this.tools = new ToolCatalog(config, { workdir })
     this.load()
   }
 
@@ -86,6 +88,17 @@ export class Team {
     return !!this.groupOf(empId)?.available
   }
 
+  /** Can this employee's group use every one of these tools? */
+  canUse(empId, toolIds = []) {
+    const g = this.groupOf(empId)
+    return toolIds.every((id) => this.tools.supports(g, id))
+  }
+
+  /** Tools a group can hand out, as { id, name } for the prompts and the page. */
+  toolsOf(g) {
+    return this.tools.list().filter((t) => this.tools.supports(g, t.id))
+  }
+
   /** Find an employee by id, name or skill, as the planner (or the boss) wrote it. */
   resolve(ref) {
     const r = String(ref || '').trim().toLowerCase()
@@ -132,6 +145,7 @@ export class Team {
       version: g.version,
       models: Object.fromEntries(DIFFS.map((d) => [d, g.modelFor(d)])),
       strengths: g.profileFor('medium').strengths,
+      tools: this.toolsOf(g).map((t) => t.name),
     }))
     const employees = this.employees.map((e) => {
       const g = this.groups.get(e.group)

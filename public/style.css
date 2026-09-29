@@ -176,6 +176,9 @@ button { font: inherit; color: inherit; }
 .gstate { margin-left: auto; font-size: 11.5px; padding: 0 6px; border: 1px solid currentColor; color: var(--ok); }
 .gstate.off { color: var(--bad); }
 .gmodels { padding: 0 10px 6px; font: 11.5px/1.5 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.gtools { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 6px; }
+.gtools span { font-size: 11px; line-height: 1.5; padding: 0 5px; border: 1px dashed var(--c, var(--line)); color: var(--muted); }
+.gtools em { font-style: normal; font-size: 11px; line-height: 1.5; color: var(--muted); }
 .staff { list-style: none; margin: 0; padding: 0 0 4px; }
 .emp {
   display: grid;

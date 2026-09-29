@@ -20,7 +20,21 @@ export function teamText(team, stats) {
       return `- ${e.id}｜${e.name}｜${g.name}${g.available ? '' : '（不在岗）'}｜${e.skill.description}${record}`
     })
     .join('\n')
-  return `### 项目组（模型）\n${groups}\n\n### 员工（id｜岗位｜所属组｜擅长）\n${people}`
+  return `### 项目组（模型）\n${groups}\n\n### 员工（id｜岗位｜所属组｜擅长）\n${people}${toolsText(team)}`
+}
+
+/** 工具柜: the plugins 傻妞 can hand out, and which groups can use each one. */
+export function toolsText(team) {
+  const groups = [...team.groups.values()].filter((g) => g.available)
+  const lines = team.tools
+    .list()
+    .map((t) => {
+      const who = groups.filter((g) => team.tools.supports(g, t.id)).map((g) => g.name)
+      if (!who.length) return null
+      return `- ${t.id}｜${t.name}｜${t.description}｜能用的组：${who.join('、')}`
+    })
+    .filter(Boolean)
+  return lines.length ? `\n\n### 工具柜（插件，id｜名称｜用途｜能用的组）\n${lines.join('\n')}` : ''
 }
 
 function historyText(history) {
@@ -49,6 +63,7 @@ const TASK_SCHEMA = `{
       "why": "为什么派给这个员工（一句话）",
       "kind": "code 或 review 或 research",
       "depends_on": [],
+      "tools": [],
       "prompt": "给员工的完整指令"
     }`
 
@@ -57,7 +72,8 @@ const ROUTING_RULES = `派活规则：
 - 按「技能对口」选员工，再看难度：hard 交给能力强的组，easy 优先便宜的组；同一个组会自动按难度切换模型。
 - 能并行的任务尽量分给不同的员工；并行任务改的文件必须互不重叠，在各自 prompt 里写清楚负责哪些文件、别碰哪些文件。有先后关系的用 depends_on。
 - 只派给在岗的员工。有战绩的员工，参考战绩。
-- 每个任务的 prompt 必须自包含：目标、背景、涉及的文件、验收标准（怎么验证：跑什么命令、看到什么结果）。员工看不到这段对话。`
+- 每个任务的 prompt 必须自包含：目标、背景、涉及的文件、验收标准（怎么验证：跑什么命令、看到什么结果）。员工看不到这段对话。
+- 工具柜：任务要真的打开网页（测试做好的网页、在网站上查资料或办事）、操作桌面软件、或用到主人装的某个插件时，在 tools 里写工具 id，并派给能用这个工具的组的员工；傻妞会自动给他装好配好。写代码、跑命令就能完成的不要配工具。电脑操作（desktop）会接管主人的鼠标键盘，只有必须操作桌面软件时才用。`
 
 export function plannerPrompt({ userText, team, stats, context, history }) {
   return `${PERSONA}
@@ -95,7 +111,22 @@ ${ROUTING_RULES}
 }`
 }
 
-export function taskPrompt({ task, employee, groupName, tasks, userText, workdir, parallel, depResults, minutes }) {
+/** What an employee should know about the plugins handed to them for this task. */
+export function toolGuide(tools = []) {
+  if (!tools.length) return ''
+  let s = `\n## 这次给你配的工具（插件）\n${tools.map((t) => `- ${t.name}（插件名 ${t.server}）：${t.description}`).join('\n')}\n`
+  if (tools.some((t) => t.id === 'browser')) {
+    s += `- 浏览器用法：先打开网址，用「看网页内容」拿到元素再点击或输入。检查本地做好的网页时，可以直接打开 HTML 文件（file:// 开头的完整路径）；需要开发服务器就放到后台启动、测完关掉。浏览器插件的工具如果一开始没列出来，先用工具搜索（ToolSearch）找 ${'`'}${tools.find((t) => t.id === 'browser').server}${'`'}。\n`
+  }
+  if (tools.some((t) => t.id === 'desktop')) {
+    s += `- 电脑操作用法：先 screenshot 看清屏幕再动手，每做一步都再截图确认；坐标按截图算。只碰和任务有关的窗口，不要关掉或修改主人别的东西。
+- 要操作的软件本身出了问题（点了没反应、报错、卡住），不要去改它的程序或文件来“修好”它，除非任务就是修它；把看到的情况如实写进汇报。
+- 遇到登录、付款、删除、给别人发消息这类敏感操作，停下来在汇报里说明，不要自己决定。\n`
+  }
+  return s
+}
+
+export function taskPrompt({ task, employee, groupName, tasks, userText, workdir, parallel, depResults, minutes, tools = [] }) {
   const roster = tasks
     .filter((t) => t.kind !== 'verify')
     .map((t) => `- [${t.id}] ${t.title} → ${t.who}${t.id === task.id ? '（你）' : ''}`)
@@ -113,7 +144,7 @@ ${roster}
 
 ## 你的任务 [${task.id}] ${task.title}
 ${task.prompt}
-`
+${toolGuide(tools)}`
   if (depResults.length) {
     s += `\n## 前置任务的汇报\n`
     s += depResults.map((d) => `### [${d.id}] ${d.title}（${d.who}）\n${truncate(d.result || '（没有汇报）', 4000)}`).join('\n\n')
@@ -307,6 +338,7 @@ export const HELP = `直接用大白话说要做什么就行，说得模糊也�
 - \`@员工 内容\`：跳过规划，直接交给某位员工（比如 \`@frontend 把按钮改成圆角\`）
 - \`/招人 描述\`：让傻妞写一个新岗位 skill，招一名新员工（比如 \`/招人 数据库专家\`）
 - \`/团队\`：看看有哪些项目组和员工
+- \`/工具\`：看看工具柜里有哪些插件（浏览器、电脑操作、你自己装的插件），要用时傻妞会自动配好
 - \`/撤销\`：撤回上一轮的全部改动
 - \`/stop\`：叫停所有正在干的活
 - \`/reset\`：让傻妞忘掉之前的对话`

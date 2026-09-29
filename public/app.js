@@ -7,9 +7,10 @@
   const TASK_STATUS = { pending: '排队', running: '进行中', done: '完成', failed: '失败', skipped: '跳过', cancelled: '取消' }
   const KIND = { code: '开发', review: '审查', research: '调研', fix: '返工', verify: '验收' }
   const DIFF = { hard: '难', medium: '中', easy: '易' }
+  const TOOL_ZH = { browser: '浏览器', desktop: '电脑操作' }
   const SUGGEST = {
-    live: ['帮我做一个记账小网站', '把这个项目整理得专业一点', '找找有没有 bug 并修掉', '/团队', '/招人 数据库专家'],
-    demo: ['帮我做一个待办清单 App', '/招人 数据库专家', '/团队', '你好呀'],
+    live: ['帮我做一个记账小网站', '把这个项目整理得专业一点', '找找有没有 bug 并修掉', '/工具', '/团队', '/招人 数据库专家'],
+    demo: ['帮我做一个待办清单 App', '/招人 数据库专家', '/工具', '/团队'],
   }
 
   const office = new window.ShaniuOffice($('#office'), $('#overlay'), $('#scene'))
@@ -99,6 +100,7 @@
       card.innerHTML = `
         <div class="group-head"><b>${esc(g.name)}</b><span class="gtype">${esc(g.typeLabel || g.type)}</span><span class="gstate ${g.available ? '' : 'off'}">${g.available ? '在岗' : '未到岗'}</span></div>
         <div class="gmodels">${g.available ? esc(uniq.size > 1 ? models.join(' · ') : `模型 ${g.models?.medium || '默认'}`) : esc(g.note || '')}</div>
+        ${g.available && g.tools?.length ? `<div class="gtools" title="要用到时傻妞会自动配好"><em>工具</em>${g.tools.map((t) => `<span>${esc(t)}</span>`).join('')}</div>` : ''}
         <ul class="staff">${staff.map((e) => empRow(e)).join('')}</ul>`
       box.appendChild(card)
     }
@@ -226,6 +228,7 @@
           </summary>
           <div class="detail">
             ${t.why ? `<div><h3>为什么派给 ${esc(t.who)}</h3><p>${esc(t.why)}</p></div>` : ''}
+            ${t.tools?.length ? `<div><h3>配的工具</h3><p>${esc(t.tools.map((x) => TOOL_ZH[x] || x).join('、'))}</p></div>` : ''}
             ${attempts ? `<div><h3>换过人</h3><ul class="log">${attempts}</ul></div>` : ''}
             <div><h3>傻妞的交代</h3><pre>${esc(t.kind === 'verify' ? '对照主人的需求整体验收（只看不改）' : t.prompt)}</pre></div>
             ${log ? `<div><h3>过程</h3><ul class="log">${log}</ul></div>` : ''}

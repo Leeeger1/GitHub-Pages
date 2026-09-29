@@ -283,6 +283,7 @@ Kimi 也提供 Anthropic 兼容地址 `https://api.moonshot.cn/anthropic`，可�
 | `headers` | openai-api | 额外请求头，有的中转站需要 |
 | `temperature` / `maxTokens` | openai-api | 生成参数，不写就用平台默认 |
 | `extraBody` | openai-api | 原样合并进请求体的额外字段，比如某些平台的思考开关 |
+| `vision` | openai-api | 模型能看图片（比如 GPT-4o、Qwen-VL）就设 `true`：插件返回的截图会发给它，傻妞也会把「电脑操作」派给这个组 |
 | `maxSteps` | openai-api | 一个任务最多调用多少次工具，默认 60 |
 | `maxContextChars` | openai-api | 对话太长时会省略早先的工具输出，默认 30 万字符 |
 | `price` | openai-api | 每百万 token 的价格 `{ "input": 1, "output": 2 }`，填了就在任务板显示花费 |

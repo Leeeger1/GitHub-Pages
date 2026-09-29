@@ -12,9 +12,11 @@ const EXCLUDES = [
   ':(glob,exclude)**/.env',
   ':(glob,exclude)**/.env.*',
   ':(glob,exclude)**/niuma.config.json',
+  // Browser plugin scratch output, in case a plugin writes it into the project anyway.
+  ':(glob,exclude)**/.playwright-mcp/**',
 ]
 
-const DEFAULT_IGNORE = ['node_modules/', '.venv/', 'venv/', '__pycache__/', '.env', '.env.*', 'niuma.config.json', '.DS_Store', '*.log', ''].join('\n')
+const DEFAULT_IGNORE = ['node_modules/', '.venv/', 'venv/', '__pycache__/', '.env', '.env.*', 'niuma.config.json', '.playwright-mcp/', '.DS_Store', '*.log', ''].join('\n')
 
 export function git(dir, ...args) {
   return spawnCmd('git', args, { cwd: dir, collect: true, timeoutMs: 60000 }).done.then((r) => ({ ...r, out: r.stdout.trim() }))

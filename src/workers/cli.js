@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { CLAUDE_DENY, SAFE_COMMANDS } from '../config.js'
+import { describeMcpCall, splitMcpName } from '../tools.js'
 import { firstLine, spawnCmd, truncate } from '../util.js'
 import { BaseWorker, shortPath } from './base.js'
 
@@ -41,8 +42,12 @@ export function describeClaudeTool(name, input = {}, workdir) {
     case 'Task':
     case 'Agent':
       return `叫了个帮手：${truncate(input.description, 30)}`
-    default:
-      return `用工具 ${name}`
+    case 'ToolSearch':
+      return '翻工具柜'
+    default: {
+      const mcp = splitMcpName(name)
+      return mcp ? describeMcpCall(mcp.server, mcp.tool, input) : `用工具 ${name}`
+    }
   }
 }
 
@@ -86,6 +91,15 @@ export function createClaudeParser(workdir) {
   }
 }
 
+function parseArgs(a) {
+  if (a && typeof a === 'object') return a
+  try {
+    return JSON.parse(a)
+  } catch {
+    return {}
+  }
+}
+
 /** Parser for `codex exec --json` (thread/turn/item events, plus the older {msg:{…}} shape). */
 export function createCodexParser(workdir) {
   let lastMessage = ''
@@ -109,7 +123,7 @@ export function createCodexParser(workdir) {
           break
         case 'item.started':
           if (it.type === 'command_execution') out.push({ kind: 'tool', text: `跑 ${truncate(cleanCmd(it.command).split('\n')[0], 60)}` })
-          else if (it.type === 'mcp_tool_call') out.push({ kind: 'tool', text: `调用 ${it.server || ''}.${it.tool || ''}` })
+          else if (it.type === 'mcp_tool_call') out.push({ kind: 'tool', text: describeMcpCall(it.server, it.tool, parseArgs(it.arguments)) })
           else if (it.type === 'web_search') out.push({ kind: 'tool', text: `上网查 ${truncate(it.query, 40)}` })
           break
         case 'item.completed':
@@ -175,10 +189,10 @@ class CliWorker extends BaseWorker {
     return this.available
   }
 
-  async run({ prompt, model = '', readOnly = false, onActivity = () => {}, timeoutMs, label = 'task' }) {
+  async run({ prompt, model = '', readOnly = false, onActivity = () => {}, timeoutMs, label = 'task', tools = [] }) {
     const log = this.openLog(label, prompt)
     const started = Date.now()
-    const { args, parser, outFile } = this.runArgs({ readOnly, label, model })
+    const { args, parser, outFile, cleanup = [] } = this.runArgs({ readOnly, label, model, tools })
     const proc = this.track(
       spawnCmd(this.command(), args, {
         cwd: this.workdir,
@@ -193,7 +207,7 @@ class CliWorker extends BaseWorker {
     )
     const r = await proc.done
     const res = parser.finish(r, outFile)
-    if (outFile) fs.rm(outFile, { force: true }, () => {})
+    for (const f of [outFile, ...cleanup]) if (f) fs.rm(f, { force: true }, () => {})
     if (r.timedOut) Object.assign(res, { ok: false, error: '超时了，被傻妞叫停' })
     else if (r.killed) Object.assign(res, { ok: false, error: '被叫停' })
     else if (r.error?.code === 'ENOENT') Object.assign(res, { ok: false, error: `找不到命令 ${this.command()}` })
@@ -204,7 +218,7 @@ class CliWorker extends BaseWorker {
 }
 
 export class ClaudeCliWorker extends CliWorker {
-  permissionArgs(readOnly) {
+  permissionArgs(readOnly, tools = []) {
     const c = this.cfg
     const args = ['--permission-mode', c.permissionMode || 'acceptEdits']
     let allow = c.allowedTools
@@ -214,6 +228,8 @@ export class ClaudeCliWorker extends CliWorker {
           ? SAFE_COMMANDS.map((p) => `Bash(${p}:*)`)
           : ['Bash', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch', 'TodoWrite', 'Task']
     }
+    // Plugins handed out for this task: `mcp__<server>` allows every tool of that server.
+    allow = [...allow, ...tools.map((t) => `mcp__${t.server}`)]
     if (allow.length) args.push('--allowedTools', ...allow)
     const deny = [...(c.disallowedTools || CLAUDE_DENY)]
     if (readOnly) deny.push('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
@@ -228,10 +244,21 @@ export class ClaudeCliWorker extends CliWorker {
     return fallback && fallback !== model ? ['--model', model, '--fallback-model', fallback] : ['--model', model]
   }
 
-  runArgs({ readOnly, model }) {
-    const args = ['-p', '--output-format', 'stream-json', '--verbose', ...this.permissionArgs(readOnly), ...this.modelArgs(model)]
+  runArgs({ readOnly, model, label, tools = [] }) {
+    const args = ['-p', '--output-format', 'stream-json', '--verbose']
+    const cleanup = []
+    const inject = this.injected(tools)
+    if (inject.length) {
+      // Start the plugins for this run only; Claude Code's own settings stay untouched.
+      const file = `${this.tmpFile(label)}.mcp.json`
+      const servers = Object.fromEntries(inject.map((t) => [t.server, { type: 'stdio', command: t.command, args: t.args || [], env: t.env || {} }]))
+      fs.writeFileSync(file, JSON.stringify({ mcpServers: servers }, null, 2))
+      args.push('--mcp-config', file)
+      cleanup.push(file)
+    }
+    args.push(...this.permissionArgs(readOnly, tools), ...this.modelArgs(model))
     args.push(...(this.cfg.extraArgs || []))
-    return { args, parser: createClaudeParser(this.workdir) }
+    return { args, parser: createClaudeParser(this.workdir), cleanup }
   }
 
   /** One-shot question with no edits: planning, acceptance notes, reports. Read-only tools stay available. */
@@ -266,10 +293,18 @@ export class CodexCliWorker extends CliWorker {
     return args
   }
 
-  runArgs({ readOnly, label, model }) {
+  runArgs({ readOnly, label, model, tools = [] }) {
     const outFile = this.tmpFile(label)
     const args = ['exec', '--json', '--skip-git-repo-check', '-C', this.workdir, '-o', outFile, ...this.sandboxArgs(readOnly)]
     if (model) args.push('-m', model)
+    // Plugins for this run only, as -c overrides (TOML values); ~/.codex/config.toml stays untouched.
+    for (const t of this.injected(tools)) {
+      const k = `mcp_servers.${t.server}`
+      args.push('-c', `${k}.command=${JSON.stringify(t.command)}`, '-c', `${k}.args=${JSON.stringify(t.args || [])}`)
+      const env = Object.entries(t.env || {})
+      if (env.length) args.push('-c', `${k}.env={${env.map(([a, b]) => `${JSON.stringify(a)}=${JSON.stringify(String(b))}`).join(',')}}`)
+      args.push('-c', `${k}.startup_timeout_sec=120`)
+    }
     args.push(...(this.cfg.extraArgs || []), '-')
     return { args, parser: createCodexParser(this.workdir), outFile }
   }
