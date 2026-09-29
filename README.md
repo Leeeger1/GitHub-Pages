@@ -6,7 +6,7 @@
 
 ![牛马工作室演示](docs/demo.gif)
 
-完整演示视频（1 分 50 秒，带字幕）：[docs/niuma-demo.mp4](docs/niuma-demo.mp4)
+完整演示视频（傻妞语音讲解 + 字幕，1 分 54 秒）：[1080p](docs/niuma-demo.mp4) · [2K](docs/niuma-demo-2k.mp4)
 
 ## 一个需求是怎么被做完的
 
