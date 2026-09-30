@@ -80,5 +80,6 @@ jobs:
             | macOS | `niuma-studio-*-mac-universal.dmg`，拖进「应用程序」；第一次打开要右键 → 打开 |
             | Linux | `niuma-studio-*-linux-x86_64.AppImage`，加上可执行权限后双击 |
 
-            装好以后打开「牛马工作室」，选一个项目文件夹就能开工。员工们用的 Claude Code / Codex 要先在电脑上装好并登录一次；
+            装好以后打开「牛马工作室」，选一个项目文件夹就能开工。还没有员工的话点右上角「接入员工」：
+            Claude Code、Codex 一键安装登录，DeepSeek、中转站这类 API 选一家填上 Key 就能接。
             想先看看效果，菜单「项目 → 彩排模式」用替身员工演一遍，不花钱、不改文件。
