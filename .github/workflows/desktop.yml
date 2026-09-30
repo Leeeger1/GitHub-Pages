@@ -1,11 +1,16 @@
 name: 桌面安装包
 
 # 推一个 v 开头的标签（比如 v0.2.0）就会在 Windows / macOS / Linux 上各打一个安装包，并发布到 Releases。
-# 也可以在 Actions 页面手动运行，只打包不发布。
+# 也可以在 Actions 页面手动运行：填上版本号就打包并发布（标签由 GitHub 自动创建），不填就只打包。
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 发布的版本号，比如 v0.2.0（留空就只打包、不发布）
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -52,7 +57,7 @@ jobs:
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -62,7 +67,9 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: 牛马工作室 ${{ github.ref_name }}
+          tag_name: ${{ inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: 牛马工作室 ${{ inputs.version || github.ref_name }}
           files: dist/*
           body: |
             ## 下载
