@@ -193,6 +193,7 @@ export class Coordinator extends EventEmitter {
     this.config = config
     this.mode = mode
     this.workdir = config.workdir
+    this.root = root
     this.team = new Team(config, { root, workdir: this.workdir, logDir: config.logDir })
     this.agents = { shaniu: { status: 'idle', text: '', available: true } }
     this.messages = []
@@ -221,8 +222,17 @@ export class Coordinator extends EventEmitter {
     const staff = this.team.employees.filter((e) => this.team.isAvailable(e.id)).length
     const team = on.length
       ? `${on.map((g) => g.name).join('、')}共 ${staff} 位牛马已就位`
-      : '可是一个项目组都没到岗（没找到 claude / codex 命令，也没配置 API），先帮傻妞把员工请来吧'
+      : '可是一个项目组都没到岗（没找到 claude / codex 命令，也没配置 API）。点上面的「接入员工」，一键就能把员工请来'
     this.addMessage('shaniu', `${hello}！牛马工作室开工啦～ ${team}。工作目录是 \`${this.workdir}\`。需求说得模糊也没关系，剩下的交给傻妞！`)
+  }
+
+  /** 配置改了（比如刚接入了新员工）：按新配置重新组队、点名，不用重启。 */
+  async reconfigure(config) {
+    if (this.busy) throw new Error('傻妞手上还有活，等这一轮做完再调整')
+    this.config = config
+    this.team = new Team(config, { root: this.root, workdir: this.workdir, logDir: config.logDir })
+    await this.team.check()
+    this.syncAgents()
   }
 
   syncAgents() {

@@ -69,3 +69,26 @@ test('LAN mode requires the token', async (t) => {
   assert.equal((await req('/api/state', { headers: { 'X-Niuma-Token': 'secret' } })).status, 200)
   assert.equal((await req('/')).status, 200)
 })
+
+test('the 接入员工 routes call the setup actions and report failures as ok:false', async (t) => {
+  const calls = []
+  const setup = {
+    status: async () => ({ groups: [], presets: [] }),
+    saveApi: async (b) => (calls.push(['api', b.preset]), { ok: true, id: b.preset }),
+    install: async (tool) => {
+      throw new Error(`装不了 ${tool}`)
+    },
+    testApi: async (a) => (calls.push(['test', a.baseUrl]), { ok: true }),
+    testCli: async (tool) => (calls.push(['cli', tool]), { ok: true }),
+  }
+  const { port, req } = await start(t, { host: '127.0.0.1', setup })
+  const post = (p, body, headers = {}) => req(p, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: `http://localhost:${port}`, ...headers }, body: JSON.stringify(body) })
+  assert.deepEqual(JSON.parse((await req('/api/setup')).body), { groups: [], presets: [] })
+  assert.deepEqual(JSON.parse((await post('/api/setup/api', { preset: 'deepseek' })).body), { ok: true, id: 'deepseek' })
+  assert.deepEqual(JSON.parse((await post('/api/setup/install', { tool: 'codex' })).body), { ok: false, error: '装不了 codex' })
+  await post('/api/setup/test', { api: { baseUrl: 'http://x/v1' } })
+  await post('/api/setup/test', { tool: 'claude' })
+  assert.deepEqual(calls, [['api', 'deepseek'], ['test', 'http://x/v1'], ['cli', 'claude']])
+  assert.equal((await post('/api/setup/nope', {})).status, 404)
+  assert.equal((await post('/api/setup/api', { preset: 'x' }, { Origin: 'https://evil.example' })).status, 403)
+})

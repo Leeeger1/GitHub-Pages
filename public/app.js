@@ -159,6 +159,11 @@
         <ul class="staff">${staff.map((e) => empRow(e)).join('')}</ul>`
       box.appendChild(card)
     }
+    const add = document.createElement('button')
+    add.type = 'button'
+    add.className = 'add-staff'
+    add.innerHTML = '<b>＋ 接入员工</b><span>Claude Code、Codex 一键安装登录；DeepSeek、中转站填 Key 就能接</span>'
+    box.appendChild(add)
     tickTimers()
   }
 
@@ -343,6 +348,7 @@
     else state.tasks[i] = task
   }
 
+  let setupPrompted = false
   function handle(ev) {
     switch (ev.type) {
       case 'snapshot':
@@ -360,6 +366,11 @@
         renderBusy()
         renderSuggest()
         renderBanner()
+        // 一个员工都没到岗：直接把「接入员工」面板打开，点一下就能接。
+        if (state.mode === 'live' && !setupPrompted && !state.roster?.groups?.some((g) => g.available)) {
+          setupPrompted = true
+          setTimeout(openSetup, 600)
+        }
         break
       case 'roster':
         state.roster = ev.roster
@@ -428,6 +439,9 @@
         state.busy = ev.busy
         renderBusy()
         break
+      case 'setup':
+        window.NiumaSetup?.event(ev)
+        break
     }
   }
 
@@ -443,7 +457,19 @@
       const r = await fetch(url + q, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Niuma-Token': token }, body: JSON.stringify(body) })
       if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
     }
-    return { send: (text) => post('/api/message', { text }), stop: () => post('/api/stop', {}) }
+    // 「接入员工」面板用：GET 不带 body，POST 带 JSON，都返回 JSON。
+    const request = async (method, url, body) => {
+      const r = await fetch(url + q, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-Niuma-Token': token },
+        body: method === 'GET' ? undefined : JSON.stringify(body || {}),
+        cache: 'no-store',
+      })
+      const type = r.headers.get('content-type') || ''
+      if (type.includes('application/json')) return r.json()
+      throw new Error(`${r.status} ${await r.text()}`)
+    }
+    return { send: (text) => post('/api/message', { text }), stop: () => post('/api/stop', {}), request }
   }
 
   async function detectServer(token) {
@@ -486,6 +512,11 @@
     }
   })
   $('#stop').addEventListener('click', () => transport && transport.stop().catch(() => {}))
+  const openSetup = () => window.NiumaSetup?.open({ request: transport?.request || null, fake: state.mode === 'fake' })
+  $('#open-setup')?.addEventListener('click', openSetup)
+  $('#team').addEventListener('click', (e) => {
+    if (e.target.closest('.add-staff')) openSetup()
+  })
   $('#skins')?.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-skin]')
     if (b) setSkin(b.dataset.skin)

@@ -7,6 +7,7 @@ import { rehearsalConfig } from '../fake/rehearsal.mjs'
 import { loadConfig } from './config.js'
 import { Coordinator } from './coordinator.js'
 import { createServer, isLoopback } from './server.js'
+import { createSetup, ensurePath } from './setup.js'
 
 function listen(server, port, host, tries = 10) {
   return new Promise((resolve, reject) => {
@@ -35,6 +36,7 @@ function listen(server, port, host, tries = 10) {
  */
 export async function startStudio({ root, workdir, configFile, overrides = {}, fake = false }) {
   if (!fs.existsSync(workdir) || !fs.statSync(workdir).isDirectory()) throw new Error(`目录不存在：${workdir}`)
+  ensurePath()
   let config = loadConfig({ workdir, configFile, overrides })
   let closeFake = () => {}
   if (fake) {
@@ -44,7 +46,9 @@ export async function startStudio({ root, workdir, configFile, overrides = {}, f
   }
   const coord = new Coordinator(config, { mode: fake ? 'fake' : 'live', root })
   const token = isLoopback(config.host) ? '' : crypto.randomBytes(12).toString('hex')
-  const server = createServer(coord, { publicDir: path.join(root, 'public'), host: config.host, token })
+  // 「接入员工」面板：改完配置后按同样的来源重新读一遍，让傻妞重新点名。
+  const setup = createSetup({ coord, fake, reload: () => coord.reconfigure(loadConfig({ workdir, configFile, overrides })) })
+  const server = createServer(coord, { publicDir: path.join(root, 'public'), host: config.host, token, setup })
   await coord.init()
   const port = await listen(server, config.port || 7777, config.host)
   const local = `http://127.0.0.1:${port}/${token ? `?token=${token}` : ''}`

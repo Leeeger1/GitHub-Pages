@@ -29,6 +29,7 @@
 - **开项目会**：新项目先讨论框架、目录和数据库，纪要存进项目，所有人照着做。
 - **按难度派活**：难题给强模型，杂活给便宜模型，同一个组也会按难度切换型号。
 - **什么模型都能当员工**：Claude Code、Codex、DeepSeek、通义、Kimi、智谱、中转站、本地模型……见 [接入 API 指南](docs/api-guide.md)。
+- **点一下就接员工**：软件里的「接入员工」面板，Claude Code、Codex 一键安装、登录；DeepSeek、通义、Kimi、中转站……选一家填上 Key 就能接，不用碰配置文件。
 - **skill 就是员工**：写一个 Markdown 岗位说明就多一名员工，或者让傻妞 `/招人`。
 - **自动配工具**：浏览器、电脑操作（看屏幕、点鼠标、打字）、你在 Claude Code / Codex 里装过的插件，用得上时傻妞自动配给员工。
 - **放心全自动**：每轮自动 git 存档，一句 `/撤销` 撤回；危险命令一律拦截。
@@ -51,14 +52,25 @@
 - 菜单「皮肤」或页面右上角：换皮肤。
 - 关掉窗口会缩到托盘（macOS 在程序坞里），活不会停；要彻底退出用菜单「项目 → 退出」或托盘右键「退出」。
 
-桌面版里已经带好了傻妞，不用另外装 Node。员工用的 Claude Code / Codex 还是要在电脑上装好并登录一次（见下面「准备」）；只用 API 员工（DeepSeek、中转站……）就不需要。
+### 接入员工：点一下就连上
+
+点页面右上角的「**接入员工**」（桌面版也可以用菜单「项目 → 接入员工」；一个员工都没到岗时会自动弹出来）：
+
+![接入员工面板](docs/setup.png)
+
+- **Claude Code / Codex**：点「一键安装」，装好后点「登录」，在弹出的窗口里登录账号，再点「测试」看它能不能回话。电脑上还没有 Node.js 时面板会提示先装（Windows 上也能一键装）。
+- **API 员工**：选一家（DeepSeek、通义千问、Kimi、智谱、硅基流动、OpenRouter、中转站、本地模型或自定义），填上 API Key（中转站和自定义还要填地址和模型名），点「测试并接入」。测试通过，新的项目组马上坐进工位，不用重启。
+- 接入的设置和 Key 只存在你自己电脑上的 `~/.niuma/config.json`（只有你的账号能读），不进项目文件夹、不上传。点「移除」就能让这组员工回家。
+- 这个面板只能在运行牛马工作室的那台电脑上用，局域网里的手机打不开。
+
+桌面版里已经带好了傻妞，不用另外装 Node；只有 Claude Code / Codex 需要 Node.js。命令行版打开的网页里也有同样的「接入员工」按钮。
 
 想自己打包：`cd desktop && npm install && npm run dist`，安装包在 `desktop/dist/`。推一个 `v` 开头的标签（比如 `v0.2.0`），GitHub Actions 会在三个系统上各打一个包并发布到 Releases。
 
 ## 准备
 
 - 命令行版需要 Node.js 18 或更高版本（桌面版不需要）
-- 至少有一个项目组能用（多多益善）：
+- 至少有一个项目组能用（多多益善）。最简单：启动后点页面上的「接入员工」，下面这些都能在里面点几下完成。手动的话：
   - Claude Code：`npm i -g @anthropic-ai/claude-code`，运行一次 `claude` 登录
   - Codex：`npm i -g @openai/codex`，运行一次 `codex` 登录
   - 或者任意 OpenAI 兼容的 API（DeepSeek、中转站、通义、Kimi、GLM、本地模型……），见下文
@@ -102,7 +114,7 @@ node bin/niuma.js ~/code/my-project
 | `codex-cli` | Codex 命令行 | 装好 `codex` 即可 |
 | `openai-api` | 任意 OpenAI 兼容接口。傻妞内置了一个编程员工，会列目录、读写文件、精确替换、搜索、跑命令 | 填 `baseUrl`、`apiKey`（或 `apiKeyEnv`）和模型名 |
 
-默认有 Claude 组和 Codex 组。在配置里加项目组就是多一片工位。**详细的接入方法（DeepSeek、中转站、通义、Kimi、智谱、硅基流动、OpenRouter、本地模型，以及怎么让 Claude Code 走中转）见 [接入 API 指南](docs/api-guide.md)。**简单的例子：
+默认有 Claude 组和 Codex 组。在配置里加项目组就是多一片工位（「接入员工」面板就是帮你把这段配置写进 `~/.niuma/config.json`）。**详细的接入方法（DeepSeek、中转站、通义、Kimi、智谱、硅基流动、OpenRouter、本地模型，以及怎么让 Claude Code 走中转）见 [接入 API 指南](docs/api-guide.md)。**简单的例子：
 
 ```json
 {
@@ -304,8 +316,9 @@ src/workers/openai.js 内置的 API 编程员工（OpenAI 兼容接口 + 文件�
 src/git.js            自动存档和撤销
 src/prompts.js        傻妞的人设和各种提示词
 src/server.js         本地网页服务（Server-Sent Events 推送实时状态）
+src/setup.js          「接入员工」：一键安装、登录、测试，写入 ~/.niuma/config.json 并重新点名
 skills/               内置岗位
-public/               办公室网页：anime.js 二次元场景、chibi.js Q 版角色、office.js 像素版、demo.js 没有服务器时的演示
+public/               办公室网页：anime.js 二次元场景、chibi.js Q 版角色、office.js 像素版、setup.js 接入员工面板、demo.js 没有服务器时的演示
 fake/                 彩排用的替身员工和假 API
 test/                 测试：npm test
 ```

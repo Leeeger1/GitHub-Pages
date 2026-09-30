@@ -23,9 +23,11 @@ export function isLoopback(host) {
   return LOOPBACK.has(host)
 }
 
-export function createServer(coord, { publicDir, host, token }) {
+export function createServer(coord, { publicDir, host, token, setup }) {
   const clients = new Set()
   const loopbackOnly = isLoopback(host)
+  // The request really comes from this computer (not a phone on the LAN), whatever address we listen on.
+  const fromThisComputer = (req) => isLoopback(String(req.socket.remoteAddress || '').replace(/^::ffff:/, ''))
 
   coord.on('event', (ev) => {
     const data = `data: ${JSON.stringify(ev)}\n\n`
@@ -96,6 +98,19 @@ export function createServer(coord, { publicDir, host, token }) {
       }
       if (req.method === 'GET' && url.pathname === '/api/state') return json(res, 200, coord.snapshot())
 
+      // 「接入员工」会装软件、开终端、写配置：只给本机用，局域网里的手机不行。
+      if (url.pathname.startsWith('/api/setup')) {
+        if (!setup) return send(res, 404, 'Not found')
+        if (!fromThisComputer(req)) return json(res, 403, { ok: false, error: '只能在运行牛马工作室的那台电脑上接入员工' })
+        if (req.method === 'GET' && url.pathname === '/api/setup') {
+          try {
+            return json(res, 200, await setup.status())
+          } catch (e) {
+            return json(res, 500, { ok: false, error: e.message })
+          }
+        }
+      }
+
       if (req.method === 'POST') {
         // Only same-origin JSON requests: a random website can't make the browser send these.
         if (!originOk(req) || !String(req.headers['content-type'] || '').startsWith('application/json')) {
@@ -116,6 +131,24 @@ export function createServer(coord, { publicDir, host, token }) {
         if (url.pathname === '/api/stop') {
           coord.stop()
           return json(res, 200, { ok: true })
+        }
+        if (setup && url.pathname.startsWith('/api/setup/')) {
+          const actions = {
+            install: () => setup.install(body.tool),
+            'install-terminal': () => setup.installInTerminal(body.tool),
+            login: () => setup.login(body.tool),
+            test: () => (body.tool ? setup.testCli(body.tool) : setup.testApi(body.api || {})),
+            api: () => setup.saveApi(body),
+            remove: () => setup.remove(body.id),
+            recheck: () => setup.recheck(),
+          }
+          const act = actions[url.pathname.slice('/api/setup/'.length)]
+          if (!act) return send(res, 404, 'Not found')
+          try {
+            return json(res, 200, await act())
+          } catch (e) {
+            return json(res, 200, { ok: false, error: e.message })
+          }
         }
       }
       return send(res, 404, 'Not found')

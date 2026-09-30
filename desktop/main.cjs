@@ -195,6 +195,11 @@ async function setSkin(id) {
   } catch {}
 }
 
+function openSetup() {
+  show()
+  win?.webContents.executeJavaScript(`document.getElementById('open-setup')?.click()`).catch(() => {})
+}
+
 async function quit() {
   if (!(await confirmStop('退出'))) return
   quitting = true
@@ -211,6 +216,8 @@ function buildMenu() {
     {
       label: '项目',
       submenu: [
+        { label: '接入员工…（Claude Code、Codex、DeepSeek、中转站）', accelerator: 'CmdOrCtrl+,', click: openSetup },
+        { type: 'separator' },
         { label: '切换项目文件夹…', accelerator: 'CmdOrCtrl+O', click: async () => openFolder(await chooseFolder()) },
         { label: '最近的项目', submenu: recent.length ? recent.map((d) => ({ label: d, click: () => openFolder(d) })) : [{ label: '（还没有）', enabled: false }] },
         { label: '在文件夹里查看', click: () => studio && shell.openPath(studio.workdir) },
@@ -258,6 +265,7 @@ function buildTray() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: '打开牛马工作室', click: show },
+      { label: '接入员工…', click: openSetup },
       { label: '切换项目文件夹…', click: async () => openFolder(await chooseFolder()) },
       { type: 'separator' },
       { label: '退出', click: quit },

@@ -1,6 +1,6 @@
 {
   "name": "niuma-studio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "牛马工作室：你只跟总管傻妞说话，她按难度和技能把任务派给各个项目组（Claude Code、Codex、DeepSeek、中转站 API…）的员工，自动验收、返工、存档。",
   "type": "module",
   "bin": {
