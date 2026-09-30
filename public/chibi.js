@@ -14,10 +14,24 @@
   }
   const strHash = (s) => [...String(s)].reduce((h, c) => hash(h + c.charCodeAt(0)), 7)
 
-  function shade(hex, amt) {
-    const n = parseInt(String(hex).slice(1), 16)
+  // 认 #rgb、#rrggbb(aa)、rgb()/rgba()；自制皮肤里别的写法（颜色名、hsl）就原样返回。
+  function toRgb(c) {
+    const s = String(c).trim()
+    let m = s.match(/^#([0-9a-f]{3,8})$/i)
+    if (m) {
+      const h = m[1].length <= 4 ? m[1].slice(0, 3).split('').map((x) => x + x).join('') : m[1].slice(0, 6)
+      const n = parseInt(h, 16)
+      return [n >> 16, (n >> 8) & 255, n & 255]
+    }
+    m = s.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i)
+    return m ? [+m[1], +m[2], +m[3]] : null
+  }
+
+  function shade(color, amt) {
+    const rgb = toRgb(color)
+    if (!rgb) return color
     const f = (v) => Math.max(0, Math.min(255, Math.round(amt < 0 ? v * (1 + amt) : v + (255 - v) * amt)))
-    return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map((v) => v.toString(16).padStart(2, '0')).join('')
+    return '#' + rgb.map((v) => f(v).toString(16).padStart(2, '0')).join('')
   }
 
   const SKINS = ['#ffe7d9', '#fcdcc8', '#f6d0b8', '#ecc0a0']

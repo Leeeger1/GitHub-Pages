@@ -1,0 +1,16 @@
+// 最简单的皮肤：只写想改的几项，其余照 base 那套来。
+// 这一套在「樱花」的基础上把强调色换成薄荷绿，窗外换成只有天空。
+{
+  "name": "薄荷",
+  "base": "sakura",
+  "colors": {
+    "accent": "#1faa84",
+    "drop": "rgba(31, 170, 132, 0.16)"
+  },
+  "room": {
+    "window": "sky",
+    "particles": "none",
+    "boss": "#c9f0e2",
+    "bossEdge": "#1faa84"
+  }
+}

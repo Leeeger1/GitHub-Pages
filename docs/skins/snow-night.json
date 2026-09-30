@@ -1,0 +1,31 @@
+// 在「夜班」的基础上：下雪、冷色调、工位台灯。
+{
+  "name": "雪夜",
+  "base": "night",
+  "dark": true,
+  "colors": {
+    "bg": "#10182a",
+    "panel": "#172238",
+    "panel2": "#1e2c47",
+    "ink": "#e6efff",
+    "muted": "#9fb2d6",
+    "line": "#2b3b5c",
+    "edge": "#3d5484",
+    "accent": "#8fc8ff",
+    "onAccent": "#0f1a2e"
+  },
+  "room": {
+    "window": "city",
+    "particles": "snow",
+    "wallPattern": "stripes",
+    "lamps": true,
+    "wall": ["#18223a", "#22304f"],
+    "wainscot": "#1b2742",
+    "trim": "#4a6aa8",
+    "floor": ["#2c3a58", "#243049"],
+    "sky": ["#050a1c", "#15244a", "#33508a"],
+    "boss": "#34508a",
+    "bossEdge": "#8fc8ff",
+    "rug": "#2c4270"
+  }
+}

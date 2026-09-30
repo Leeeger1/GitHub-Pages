@@ -34,14 +34,14 @@
       sky: ['#070b2a', '#18205a', '#3a3f86'], ink: '#e8e4ff', plant: ['#3f8a63', '#2c6a4a'], pot: '#8a5a7a',
     },
     neon: {
-      name: '赛博霓虹', dark: true, window: 'cyber', particles: 'bits', neon: true,
+      name: '赛博霓虹', dark: true, window: 'cyber', particles: 'none', wallPattern: 'grid', neon: true,
       wall: ['#120a26', '#1e0f3a'], wainscot: '#180c30', trim: '#ff2fd0', floor: ['#120a28', '#0c061c'], floorLine: '#00e5ff',
       desk: '#1c1438', deskTop: '#2b1e55', deskEdge: '#ff2fd0', chair: '#00c8ff', monitor: '#161030', monitorEdge: '#00e5ff',
       table: '#1d1438', tableEdge: '#00e5ff', rug: '#2e1052', frame: '#2b1650', frameEdge: '#ff2fd0', boss: '#3a1256', bossEdge: '#ff2fd0',
       sky: ['#14042c', '#3d0a60', '#ff2f8f'], ink: '#eafcff', plant: ['#00e5a0', '#00a07a'], pot: '#ff2fd0',
     },
     neko: {
-      name: '猫耳咖啡', dark: false, window: 'garden', particles: 'paws', catEars: true, cat: true,
+      name: '猫耳咖啡', dark: false, window: 'garden', particles: 'none', wallPattern: 'paws', catEars: true, cat: true,
       wall: ['#fff8ec', '#fbead3'], wainscot: '#f4dcbc', trim: '#dcae7e', floor: ['#ebcda6', '#e1c098'], floorLine: '#cda377',
       desk: '#f7e5ca', deskTop: '#fff5e4', deskEdge: '#d4ad82', chair: '#f7b267', monitor: '#fffbf4', monitorEdge: '#dcc6a8',
       table: '#fff6e8', tableEdge: '#d9b78e', rug: '#f8dcbc', frame: '#fffdf8', frameEdge: '#dcae7e', boss: '#ffdcae', bossEdge: '#f2a04a',
@@ -62,11 +62,24 @@
   }
 
   class AnimeOffice {
+    /** skin：内置皮肤的名字，或者一份自制皮肤（NiumaSkinFormat.normalize 整理过的） */
     constructor(scene, overlay, skin = 'sakura') {
       this.scene = scene
       this.overlay = overlay
-      this.skinId = SKINS[skin] ? skin : 'sakura'
-      this.S = SKINS[this.skinId]
+      if (skin && typeof skin === 'object') {
+        this.skinId = SKINS[skin.base] ? skin.base : 'sakura'
+        this.S = {
+          ...SKINS[this.skinId],
+          ...skin.room,
+          dark: !!skin.dark,
+          wallImage: skin.images?.wall || '',
+          windowImage: skin.images?.window || '',
+          portraitBg: skin.colors?.panel2 || '',
+        }
+      } else {
+        this.skinId = SKINS[skin] ? skin : 'sakura'
+        this.S = SKINS[this.skinId]
+      }
       this.canvas = scene.querySelector('canvas')
       if (this.canvas) this.canvas.style.display = 'none'
       this.svg = el('svg', { class: `anime-svg skin-${this.skinId}`, preserveAspectRatio: 'xMidYMid meet' })
@@ -110,7 +123,7 @@
     }
 
     portrait(emp) {
-      return C.portrait(this.look(emp), this.S.dark ? '#2a2d55' : '#fff4f9')
+      return C.portrait(this.look(emp), this.S.portraitBg || (this.S.dark ? '#2a2d55' : '#fff4f9'))
     }
 
     // ---- 布局 --------------------------------------------------------------------------------------
@@ -227,14 +240,16 @@
       const S = this.S
       const W = this.W
       let s = `<rect width="${W}" height="${FLOOR_Y}" fill="url(#an-wall)"/>`
+      if (S.wallImage) s += `<image href="${S.wallImage}" width="${W}" height="${FLOOR_Y - 34}" preserveAspectRatio="xMidYMid slice"/>`
       s += `<rect y="${FLOOR_Y - 34}" width="${W}" height="34" fill="${S.wainscot}"/><rect y="${FLOOR_Y - 35}" width="${W}" height="2" fill="${S.trim}" opacity=".8"/>`
-      if (S.neon) {
-        for (let x = 0; x < W; x += 24) s += `<rect x="${x}" y="0" width="1" height="${FLOOR_Y - 35}" fill="#ff2fd0" opacity=".08"/>`
-        s += `<rect y="${FLOOR_Y - 36}" width="${W}" height="2" fill="#ff2fd0" filter="url(#an-glow)" class="neon-strip"/>`
-      }
-      if (S.particles === 'paws') {
-        for (let x = 20; x < W; x += 46) for (let y = 16; y < FLOOR_Y - 40; y += 34) s += this.paw(x + ((y / 34) % 2) * 23, y, '#f1d7b5')
-      }
+      // 墙上的花纹（颜色跟着墙裙和装饰线走；贴了墙纸就不画）
+      const top = FLOOR_Y - 40
+      const pattern = S.wallImage ? 'none' : S.wallPattern
+      if (pattern === 'grid') for (let x = 0; x < W; x += 24) s += `<rect x="${x}" y="0" width="1" height="${FLOOR_Y - 35}" fill="${S.trim}" opacity=".08"/>`
+      if (pattern === 'paws') for (let x = 20; x < W; x += 46) for (let y = 16; y < top; y += 34) s += this.paw(x + ((y / 34) % 2) * 23, y, C.shade(S.wainscot, -0.03))
+      if (pattern === 'dots') for (let x = 14; x < W; x += 28) for (let y = 12; y < top; y += 24) s += `<circle cx="${x + ((y / 24) % 2) * 14}" cy="${y}" r="2.4" fill="${S.trim}" opacity=".35"/>`
+      if (pattern === 'stripes') for (let x = 0; x < W; x += 36) s += `<rect x="${x}" y="0" width="18" height="${FLOOR_Y - 35}" fill="${S.wainscot}" opacity=".35"/>`
+      if (S.neon) s += `<rect y="${FLOOR_Y - 36}" width="${W}" height="2" fill="${S.trim}" filter="url(#an-glow)" class="neon-strip"/>`
       s += `<rect y="${FLOOR_Y}" width="${W}" height="${H - FLOOR_Y}" fill="url(#an-floor)"/>`
       if (S.neon) {
         for (let y = FLOOR_Y + 10; y < H; y += 14) s += `<rect y="${y}" width="${W}" height="1" fill="${S.floorLine}" opacity=".18"/>`
@@ -266,7 +281,17 @@
       const S = this.S
       let v = `<g transform="translate(${x},${y})"><rect x="-4" y="-4" width="${w + 8}" height="${h + 8}" rx="8" fill="${S.frame}" stroke="${S.frameEdge}" stroke-width="3"/>`
       v += `<svg x="0" y="0" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="url(#an-sky)"/>`
-      if (S.window === 'sakura') {
+      if (S.window === 'image' && S.windowImage) {
+        v += `<image href="${S.windowImage}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`
+      } else if (S.window === 'sea') {
+        v += `<circle cx="${w * 0.76}" cy="${h * 0.34}" r="9" fill="#fff4c2"/><ellipse cx="${w * 0.28}" cy="16" rx="18" ry="6" fill="#fff" opacity=".9"/>`
+        v += `<rect y="${h * 0.56}" width="${w}" height="${h * 0.44}" fill="#3fa9dc"/><rect y="${h * 0.56}" width="${w}" height="3" fill="#bfeaff" opacity=".8"/>`
+        for (let i = 0; i < 6; i++) v += `<path class="wave" style="animation-delay:-${i * 0.7}s" d="M${(i * 41) % w},${h * 0.66 + (i % 3) * 6} q5,-3 10,0 q5,3 10,0" stroke="#e6f7ff" stroke-width="1.4" fill="none" opacity=".8"/>`
+        v += `<path d="M0,${h} Q${w * 0.3},${h - 14} ${w * 0.62},${h - 6} T${w},${h - 8} V${h} Z" fill="#f6dfae"/>`
+        v += `<path d="M${w * 0.12},${h - 30} l6,-12 l6,12 Z" fill="#fff" opacity=".95"/><rect x="${w * 0.12 + 5.5}" y="${h - 30}" width="1" height="6" fill="#8a6040"/>`
+      } else if (S.window === 'sky') {
+        v += `<g class="clouds"><ellipse cx="${w * 0.3}" cy="22" rx="22" ry="8" fill="#fff" opacity=".9"/><ellipse cx="${w * 0.37}" cy="18" rx="12" ry="8" fill="#fff" opacity=".9"/><ellipse cx="${w * 0.75}" cy="40" rx="18" ry="6" fill="#fff" opacity=".8"/></g>`
+      } else if (S.window === 'sakura') {
         v += `<g class="clouds"><ellipse cx="${w * 0.3}" cy="20" rx="22" ry="8" fill="#fff" opacity=".9"/><ellipse cx="${w * 0.36}" cy="16" rx="12" ry="8" fill="#fff" opacity=".9"/><ellipse cx="${w * 0.78}" cy="30" rx="18" ry="6" fill="#fff" opacity=".8"/></g>`
         v += `<path d="M0,${h} Q${w * 0.3},${h - 22} ${w * 0.6},${h - 12} T${w},${h - 16} V${h} Z" fill="#b8e3b0"/>`
         v += `<path d="M${w},0 C${w - 30},14 ${w - 50},10 ${w - 72},30" stroke="#8a5a4a" stroke-width="3" fill="none"/>`
@@ -347,6 +372,16 @@
       }
       if (S.particles === 'stars' && !reduceMotion()) {
         for (let i = 0; i < 10; i++) s += `<circle class="dust" style="animation-delay:-${rnd(0, 8).toFixed(1)}s" cx="${(i * 131) % W}" cy="${rnd(40, 280).toFixed(0)}" r="1" fill="#ffe9a8" opacity=".5"/>`
+      }
+      if (S.particles === 'snow' && !reduceMotion()) {
+        for (let i = 0; i < 26; i++) {
+          s += `<g class="petal snow" style="animation-duration:${rnd(10, 18).toFixed(1)}s;animation-delay:-${rnd(0, 16).toFixed(1)}s;--dx:${rnd(-30, 40).toFixed(0)}px"><circle cx="${(i * 89) % W}" cy="-6" r="${rnd(1.2, 2.6).toFixed(1)}" fill="#fff" opacity=".9"/></g>`
+        }
+      }
+      if (S.particles === 'bubbles' && !reduceMotion()) {
+        for (let i = 0; i < 14; i++) {
+          s += `<g class="bubble" style="animation-duration:${rnd(8, 14).toFixed(1)}s;animation-delay:-${rnd(0, 12).toFixed(1)}s"><circle cx="${(i * 113) % W}" cy="${H + 8}" r="${rnd(2, 5).toFixed(1)}" fill="#fff" fill-opacity=".25" stroke="#fff" stroke-opacity=".7" stroke-width=".8"/></g>`
+        }
       }
       return s
     }
@@ -726,5 +761,6 @@
   }
 
   AnimeOffice.SKINS = Object.fromEntries(Object.entries(SKINS).map(([id, s]) => [id, { name: s.name, dark: s.dark }]))
+  AnimeOffice.SKINS = SKINS
   window.AnimeOffice = AnimeOffice
 })()

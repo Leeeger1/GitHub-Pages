@@ -20,13 +20,17 @@
 
   // ---- skins -------------------------------------------------------------------
   // 二次元皮肤用 anime.js（SVG），像素复古用 office.js（canvas）；两者接口一样，可以随时切换。
-  const SKINS = [
+  // 自制皮肤在一套内置皮肤（base）的基础上改颜色、图片和摆设：存在 ~/.niuma/skins（有服务器时），
+  // 或者存在这个浏览器里（网页演示）。格式和检查见 skin-format.js。
+  const F = window.NiumaSkinFormat
+  const BUILTIN = [
     ['sakura', '樱花'],
     ['night', '夜班'],
     ['neon', '赛博霓虹'],
     ['neko', '猫耳咖啡'],
     ['pixel', '像素复古'],
   ]
+  const LOCAL_SKINS = 'niuma.localSkins'
   const store = {
     get(k) {
       try {
@@ -38,40 +42,204 @@
     set(k, v) {
       try {
         localStorage.setItem(k, v)
-      } catch {}
+        return localStorage.getItem(k) === v
+      } catch {
+        return false
+      }
     },
   }
-  const known = (s) => SKINS.some(([id]) => id === s)
-  const prefersDark = () => window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches
-  let skin = [new URLSearchParams(location.search).get('skin'), store.get('niuma.skin')].find(known) || (prefersDark() ? 'night' : 'sakura')
-
-  function makeOffice(id) {
-    document.documentElement.dataset.skin = id
-    if (id === 'pixel' || !window.AnimeOffice) return new window.ShaniuOffice($('#office'), $('#overlay'), $('#scene'))
-    return new window.AnimeOffice($('#scene'), $('#overlay'), id)
+  const clean = (skin) => {
+    const { warnings, file, ...rest } = skin
+    return rest
   }
-  let office = makeOffice(skin)
+  function readLocalSkins() {
+    try {
+      return JSON.parse(store.get(LOCAL_SKINS) || '[]').map((raw) => ({ ...F.normalize(raw), local: true }))
+    } catch {
+      return []
+    }
+  }
+  let customSkins = readLocalSkins()
+  let skinErrors = []
+  let skinDir = ''
+  const skinDef = (id) => {
+    const b = BUILTIN.find(([bid]) => bid === id)
+    return b ? { id, name: b[1], base: id, builtin: true } : customSkins.find((sk) => sk.id === id) || null
+  }
+  const prefersDark = () => window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches
+  const wantedSkin = [new URLSearchParams(location.search).get('skin'), store.get('niuma.skin')].find(Boolean) || ''
+  let current = skinDef(wantedSkin) || skinDef(prefersDark() ? 'night' : 'sakura')
+  // 想要的是 ~/.niuma/skins 里的皮肤：等连上服务器读到了再换过去
+  let pendingSkin = current.id === wantedSkin ? null : wantedSkin || null
+  let setVars = []
 
-  function setSkin(id) {
-    if (!known(id) || id === skin) return
-    skin = id
-    store.set('niuma.skin', id)
+  function applyVars(def) {
+    const root = document.documentElement
+    for (const k of setVars) root.style.removeProperty(k)
+    setVars = []
+    if (def.builtin) return
+    const vars = F.cssVars(def)
+    if (def.font) vars['--font-display'] = `"${def.font}", var(--font-body)`
+    vars['color-scheme'] = def.dark ? 'dark' : 'light'
+    for (const [k, v] of Object.entries(vars)) {
+      root.style.setProperty(k, v)
+      setVars.push(k)
+    }
+  }
+
+  function makeOffice(def) {
+    const root = document.documentElement
+    root.dataset.skin = def.base
+    root.dataset.skinId = def.id
+    applyVars(def)
+    if (def.base === 'pixel' || !window.AnimeOffice) return new window.ShaniuOffice($('#office'), $('#overlay'), $('#scene'))
+    return new window.AnimeOffice($('#scene'), $('#overlay'), def.builtin ? def.id : def)
+  }
+  let office = makeOffice(current)
+
+  /** 换画面（不记住选择；编辑器预览也走这里） */
+  function showSkin(def) {
     office.destroy?.()
-    office = makeOffice(id)
+    office = makeOffice(def)
     faces.clear()
     office.setRoster(state.roster)
     for (const [aid, a] of Object.entries(state.agents)) office.setAgent(aid, a)
     office.setTasks(state.tasks)
     if (state.meeting?.status === 'open') office.meeting(state.meeting)
-    renderSkins()
     renderTeam()
     renderMessages()
+  }
+
+  function setSkin(id) {
+    const def = skinDef(id)
+    if (!def) {
+      pendingSkin = id
+      return false
+    }
+    pendingSkin = null
+    current = def
+    store.set('niuma.skin', id)
+    showSkin(def)
+    renderSkins()
+    return true
   }
 
   function renderSkins() {
     const box = $('#skins')
     if (!box) return
-    box.innerHTML = '<span class="skins-label">皮肤</span>' + SKINS.map(([id, name]) => `<button type="button" data-skin="${id}" aria-pressed="${id === skin}">${name}</button>`).join('')
+    const btn = (d, cls = '') => `<button type="button" data-skin="${esc(d.id)}"${cls} aria-pressed="${d.id === current.id}">${esc(d.name)}</button>`
+    box.innerHTML =
+      '<span class="skins-label">皮肤</span>' +
+      BUILTIN.map(([id, name]) => btn({ id, name })).join('') +
+      customSkins.map((d) => btn(d, ` class="custom" title="自制皮肤${d.author ? ` · ${esc(d.author)}` : ''}"`)).join('') +
+      `<button type="button" class="make-skin" data-act="make-skin">${current.builtin ? '＋ 做皮肤' : '✎ 改皮肤'}</button>`
+  }
+
+  /** 读一遍自制皮肤（~/.niuma/skins + 这个浏览器里的）。手改了皮肤文件，回到窗口就会重新读。 */
+  let skinsLoading = null
+  function loadSkins() {
+    skinsLoading ||= (async () => {
+      let files = []
+      if (transport?.request) {
+        try {
+          const r = await transport.request('GET', '/api/skins')
+          files = (r.skins || []).flatMap((raw) => {
+            try {
+              return [{ ...F.normalize(raw, { id: raw.id }), id: raw.id }]
+            } catch {
+              return []
+            }
+          })
+          skinErrors = r.errors || []
+          skinDir = r.dir || ''
+        } catch {}
+      }
+      const local = readLocalSkins().filter((l) => !files.some((f) => f.id === l.id))
+      const before = JSON.stringify(customSkins.map(clean))
+      customSkins = [...files, ...local]
+      const target = pendingSkin || (current.builtin ? null : current.id)
+      if (target) {
+        const def = skinDef(target)
+        if (def && (pendingSkin || JSON.stringify(clean(def)) !== JSON.stringify(clean(current)))) {
+          pendingSkin = null
+          current = def
+          showSkin(def)
+        } else if (!def && pendingSkin) {
+          pendingSkin = null // 要的皮肤已经不在了，就用现在这套
+        } else if (!def) {
+          current = skinDef(current.base) // 皮肤文件被删了
+          showSkin(current)
+        }
+      }
+      if (before !== JSON.stringify(customSkins.map(clean)) || target) renderSkins()
+      window.NiumaSkinEditor?.refresh?.()
+    })().finally(() => (skinsLoading = null))
+    return skinsLoading
+  }
+
+  /** 读内置皮肤的界面颜色（给编辑器当起点） */
+  function baseColors(base) {
+    const root = document.documentElement
+    const saved = { skin: root.dataset.skin, style: root.getAttribute('style') }
+    root.dataset.skin = base
+    root.removeAttribute('style')
+    const cs = getComputedStyle(root)
+    const out = {}
+    for (const [k, v] of Object.entries(F.COLOR_VARS)) out[k] = cs.getPropertyValue(v).trim()
+    root.dataset.skin = saved.skin
+    if (saved.style) root.setAttribute('style', saved.style)
+    return out
+  }
+
+  async function saveSkin(raw, { replace = false } = {}) {
+    if (transport?.request) {
+      const r = await transport.request('POST', '/api/skins/save', { skin: raw, replace })
+      if (!r.ok) return r
+      await loadSkins()
+      setSkin(r.skin.id)
+      return { ok: true, skin: skinDef(r.skin.id), where: r.skin.file }
+    }
+    // 网页演示：存在这个浏览器里
+    const skin = F.normalize(raw)
+    if (!replace) for (let n = 2, id = skin.id; skinDef(skin.id); n++) skin.id = `${id}-${n}`
+    const list = readLocalSkins().filter((l) => l.id !== skin.id)
+    list.push(skin)
+    if (!store.set(LOCAL_SKINS, JSON.stringify(list.map(clean)))) return { ok: false, error: '浏览器存不下了（图片可能太大）。换小一点的图片，或者用「导出文件」存到电脑上。' }
+    customSkins = [...customSkins.filter((c) => !c.local && c.id !== skin.id), ...list.map((l) => ({ ...l, local: true }))]
+    setSkin(skin.id)
+    return { ok: true, skin: skinDef(skin.id), where: '这个浏览器里' }
+  }
+
+  async function removeSkin(id) {
+    const def = skinDef(id)
+    if (!def || def.builtin) return { ok: false, error: '内置皮肤删不了' }
+    if (def.local) store.set(LOCAL_SKINS, JSON.stringify(readLocalSkins().filter((l) => l.id !== id).map(clean)))
+    else {
+      const r = await transport.request('POST', '/api/skins/delete', { id })
+      if (!r.ok) return r
+    }
+    customSkins = customSkins.filter((c) => c.id !== id)
+    if (current.id === id) setSkin(def.base)
+    await loadSkins()
+    renderSkins()
+    return { ok: true }
+  }
+
+  // 给皮肤编辑器和桌面版用
+  window.NiumaSkin = {
+    current: () => current,
+    list: () => [...BUILTIN.map(([id]) => skinDef(id)), ...customSkins],
+    builtin: BUILTIN,
+    baseColors,
+    baseRoom: (base) => window.AnimeOffice?.SKINS?.[base === 'pixel' ? 'sakura' : base] || null,
+    preview: (def) => showSkin(def),
+    restore: () => showSkin(current),
+    set: setSkin,
+    reload: loadSkins,
+    save: saveSkin,
+    remove: removeSkin,
+    openFolder: () => (transport?.request ? transport.request('POST', '/api/skins/open-folder', {}) : Promise.resolve({ ok: false, error: '网页演示里没有皮肤文件夹' })),
+    info: () => ({ server: !!transport?.request, dir: skinDir, errors: skinErrors }),
   }
 
   // ---- helpers ---------------------------------------------------------------
@@ -520,8 +688,16 @@
   $('#skins')?.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-skin]')
     if (b) setSkin(b.dataset.skin)
+    if (e.target.closest('[data-act="make-skin"]')) window.NiumaSkinEditor?.open()
   })
   renderSkins()
+  // 手改了皮肤文件：切回窗口就重新读一遍
+  let lastSkinCheck = 0
+  window.addEventListener('focus', () => {
+    if (Date.now() - lastSkinCheck < 3000 || window.NiumaSkinEditor?.isOpen?.()) return
+    lastSkinCheck = Date.now()
+    loadSkins()
+  })
   $('#undo').addEventListener('click', () => send('/撤销'))
 
   // ---- boot ------------------------------------------------------------------
@@ -535,5 +711,6 @@
     renderSuggest()
     if (await detectServer(token)) transport = connectLive(token)
     else transport = window.ShaniuDemo(handle)
+    loadSkins()
   })()
 })()

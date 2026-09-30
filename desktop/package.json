@@ -1,7 +1,7 @@
 {
   "name": "niuma-studio-desktop",
   "productName": "牛马工作室",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "牛马工作室桌面版：你只跟总管傻妞说话，她带着 Claude Code、Codex、DeepSeek 等 AI 员工把活干完。",
   "author": "Leeeger1",
   "license": "MIT",

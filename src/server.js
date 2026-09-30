@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
+import * as skinStore from './skins.js'
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -23,7 +24,7 @@ export function isLoopback(host) {
   return LOOPBACK.has(host)
 }
 
-export function createServer(coord, { publicDir, host, token, setup }) {
+export function createServer(coord, { publicDir, host, token, setup, skins = skinStore }) {
   const clients = new Set()
   const loopbackOnly = isLoopback(host)
   // The request really comes from this computer (not a phone on the LAN), whatever address we listen on.
@@ -61,13 +62,13 @@ export function createServer(coord, { publicDir, host, token, setup }) {
   }
   const authOk = (req, url) => !token || req.headers['x-niuma-token'] === token || url.searchParams.get('token') === token
 
-  const readBody = (req) =>
+  const readBody = (req, max = 200_000) =>
     new Promise((resolve, reject) => {
       let body = ''
       req.setEncoding('utf8')
       req.on('data', (c) => {
         body += c
-        if (body.length > 200_000) {
+        if (body.length > max) {
           reject(new Error('too large'))
           req.destroy()
         }
@@ -111,6 +112,18 @@ export function createServer(coord, { publicDir, host, token, setup }) {
         }
       }
 
+      // 自制皮肤：谁都能看；存、删、开文件夹只给本机。
+      if (req.method === 'GET' && url.pathname === '/api/skins') {
+        try {
+          return json(res, 200, skins.listSkins())
+        } catch (e) {
+          return json(res, 500, { ok: false, error: e.message })
+        }
+      }
+      if (url.pathname.startsWith('/api/skins/') && !fromThisComputer(req)) {
+        return json(res, 403, { ok: false, error: '只能在运行牛马工作室的那台电脑上改皮肤' })
+      }
+
       if (req.method === 'POST') {
         // Only same-origin JSON requests: a random website can't make the browser send these.
         if (!originOk(req) || !String(req.headers['content-type'] || '').startsWith('application/json')) {
@@ -118,7 +131,8 @@ export function createServer(coord, { publicDir, host, token, setup }) {
         }
         let body = {}
         try {
-          body = JSON.parse((await readBody(req)) || '{}')
+          // 皮肤可能带图片，放宽到 12MB
+          body = JSON.parse((await readBody(req, url.pathname === '/api/skins/save' ? 12_000_000 : 200_000)) || '{}')
         } catch {
           return send(res, 400, 'Bad JSON')
         }
@@ -131,6 +145,20 @@ export function createServer(coord, { publicDir, host, token, setup }) {
         if (url.pathname === '/api/stop') {
           coord.stop()
           return json(res, 200, { ok: true })
+        }
+        if (url.pathname.startsWith('/api/skins/')) {
+          const actions = {
+            save: () => ({ ok: true, skin: skins.saveSkin(body.skin, { replace: !!body.replace }) }),
+            delete: () => skins.deleteSkin(body.id),
+            'open-folder': () => skins.openSkinsFolder(),
+          }
+          const act = actions[url.pathname.slice('/api/skins/'.length)]
+          if (!act) return send(res, 404, 'Not found')
+          try {
+            return json(res, 200, await act())
+          } catch (e) {
+            return json(res, 200, { ok: false, error: e.message })
+          }
         }
         if (setup && url.pathname.startsWith('/api/setup/')) {
           const actions = {

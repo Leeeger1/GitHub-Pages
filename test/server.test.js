@@ -92,3 +92,25 @@ test('the 接入员工 routes call the setup actions and report failures as ok:f
   assert.equal((await post('/api/setup/nope', {})).status, 404)
   assert.equal((await post('/api/setup/api', { preset: 'x' }, { Origin: 'https://evil.example' })).status, 403)
 })
+
+test('skin routes: anyone with the page can list, saving goes through the skin store', async (t) => {
+  const calls = []
+  const skins = {
+    listSkins: () => ({ dir: '/x', skins: [{ id: 'a', name: 'A' }], errors: [] }),
+    saveSkin: (skin, o) => (calls.push(['save', skin.name, o.replace]), { id: 'a', name: skin.name }),
+    deleteSkin: (id) => {
+      throw new Error(`找不到 ${id}`)
+    },
+    openSkinsFolder: () => (calls.push(['open']), { ok: true }),
+  }
+  const { port, req } = await start(t, { host: '127.0.0.1', skins })
+  const post = (p, body) => req(p, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: `http://localhost:${port}` }, body: JSON.stringify(body) })
+  assert.deepEqual(JSON.parse((await req('/api/skins')).body).skins, [{ id: 'a', name: 'A' }])
+  assert.deepEqual(JSON.parse((await post('/api/skins/save', { skin: { name: '海边' }, replace: true })).body), { ok: true, skin: { id: 'a', name: '海边' } })
+  assert.deepEqual(JSON.parse((await post('/api/skins/delete', { id: 'b' })).body), { ok: false, error: '找不到 b' })
+  await post('/api/skins/open-folder', {})
+  assert.deepEqual(calls, [['save', '海边', true], ['open']])
+  // 带图片的皮肤比普通请求大
+  const big = await post('/api/skins/save', { skin: { name: 'x'.repeat(10), pad: 'a'.repeat(1_000_000) } })
+  assert.equal(JSON.parse(big.body).ok, true)
+})

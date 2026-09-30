@@ -26,6 +26,7 @@ let tray = null
 let studio = null
 let quitting = false
 let settings = {}
+let skinStore = null // src/skins.js：菜单里列出自制皮肤
 
 const icon = (name) => path.join(__dirname, 'build', name)
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json')
@@ -72,6 +73,7 @@ async function start(workdir, { fake = false } = {}) {
     studio = null
   }
   const { startStudio } = await import(pathToFileURL(path.join(CORE, 'src', 'studio.js')).href)
+  skinStore ||= await import(pathToFileURL(path.join(CORE, 'src', 'skins.js')).href)
   studio = await startStudio({ root: CORE, workdir, fake, overrides: { host: '127.0.0.1', port: 17777 } })
   studio.fake = fake
   studio.workdir = workdir
@@ -114,7 +116,7 @@ function createWindow() {
   win.webContents.on('did-finish-load', async () => {
     if (!studio) return
     try {
-      const skin = await win.webContents.executeJavaScript('document.documentElement.dataset.skin || ""')
+      const skin = await win.webContents.executeJavaScript('document.documentElement.dataset.skinId || document.documentElement.dataset.skin || ""')
       if (settings.skin && skin && skin !== settings.skin) await setSkin(settings.skin)
       else if (skin && skin !== settings.skin) {
         settings.skin = skin
@@ -123,6 +125,7 @@ function createWindow() {
       }
     } catch {}
   })
+  win.on('focus', () => syncSkins())
   win.on('close', (e) => {
     if (quitting || process.platform === 'darwin' || !tray) return
     e.preventDefault()
@@ -191,8 +194,39 @@ async function setSkin(id) {
   saveSettings()
   buildMenu()
   try {
-    await win.webContents.executeJavaScript(`document.querySelector('#skins button[data-skin="${id}"]')?.click()`)
+    // 自制皮肤要等页面读完 ~/.niuma/skins 才有，NiumaSkin.set 会先记着
+    await win.webContents.executeJavaScript(`window.NiumaSkin ? window.NiumaSkin.set(${JSON.stringify(id)}) : document.querySelector('#skins button[data-skin=${JSON.stringify(id)}]')?.click()`)
   } catch {}
+}
+
+/** 页面里点了别的皮肤、或者皮肤文件夹有变化：回到窗口时同步一下菜单 */
+async function syncSkins() {
+  if (!win || !studio) return
+  try {
+    const skin = await win.webContents.executeJavaScript('document.documentElement.dataset.skinId || ""')
+    if (skin && skin !== '__preview') settings.skin = skin
+  } catch {}
+  saveSettings()
+  buildMenu()
+}
+
+function customSkins() {
+  try {
+    return skinStore ? skinStore.listSkins({ images: false }).skins.map((s) => [s.id, s.name]) : []
+  } catch {
+    return []
+  }
+}
+
+function openSkinEditor() {
+  show()
+  win?.webContents.executeJavaScript('window.NiumaSkinEditor?.open()').catch(() => {})
+}
+
+function openSkinsFolder() {
+  const dir = path.join(os.homedir(), '.niuma', 'skins')
+  fs.mkdirSync(dir, { recursive: true })
+  shell.openPath(dir)
 }
 
 function openSetup() {
@@ -208,6 +242,7 @@ async function quit() {
 }
 
 function buildMenu() {
+  const mine = customSkins()
   const recent = (settings.recent || []).filter((d) => d !== studio?.workdir && fs.existsSync(d)).slice(0, 6)
   const template = [
     ...(process.platform === 'darwin'
@@ -227,7 +262,18 @@ function buildMenu() {
         ...(process.platform === 'darwin' ? [] : [{ type: 'separator' }, { label: '退出', accelerator: 'Ctrl+Q', click: quit }]),
       ],
     },
-    { label: '皮肤', submenu: SKINS.map(([id, name]) => ({ label: name, type: 'radio', checked: (settings.skin || 'sakura') === id, click: () => setSkin(id) })) },
+    {
+      label: '皮肤',
+      submenu: [
+        ...SKINS.map(([id, name]) => ({ label: name, type: 'radio', checked: (settings.skin || 'sakura') === id, click: () => setSkin(id) })),
+        // 自制皮肤和内置的放在同一组单选里（中间隔开会变成两组，各选中一个）
+        ...mine.map(([id, name]) => ({ label: `${name}（自制）`, type: 'radio', checked: settings.skin === id, click: () => setSkin(id) })),
+        { type: 'separator' },
+        { label: '做皮肤 / 改皮肤…', click: openSkinEditor },
+        { label: '打开皮肤文件夹', click: openSkinsFolder },
+        { label: '皮肤说明和模板', click: () => shell.openExternal(`${REPO}/blob/main/docs/skin-guide.md`) },
+      ],
+    },
     {
       label: '视图',
       submenu: [
