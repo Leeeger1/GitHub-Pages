@@ -122,10 +122,18 @@
       this.t0 = performance.now()
       this.setRoster(this.roster)
       const loop = () => {
+        if (this.dead) return
         if (!document.hidden) this.draw((performance.now() - this.t0) / 1000)
         requestAnimationFrame(loop)
       }
       requestAnimationFrame(loop)
+    }
+
+    /** Stop drawing and clear the stage, for switching to another skin. */
+    destroy() {
+      this.dead = true
+      this.overlay.innerHTML = ''
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
     }
 
     now() {

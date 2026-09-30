@@ -1,0 +1,125 @@
+{
+  "name": "niuma-studio-desktop",
+  "productName": "牛马工作室",
+  "version": "0.2.0",
+  "description": "牛马工作室桌面版：你只跟总管傻妞说话，她带着 Claude Code、Codex、DeepSeek 等 AI 员工把活干完。",
+  "author": "Leeeger1",
+  "license": "MIT",
+  "homepage": "https://github.com/Leeeger1/niuma-studio",
+  "repository": "github:Leeeger1/niuma-studio",
+  "private": true,
+  "main": "main.cjs",
+  "desktopName": "niuma-studio.desktop",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "io.github.leeeger1.niuma-studio",
+    "productName": "牛马工作室",
+    "artifactName": "niuma-studio-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.cjs",
+      "package.json",
+      "build/tray.png",
+      "build/tray@2x.png",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../bin",
+        "to": "core/bin"
+      },
+      {
+        "from": "../src",
+        "to": "core/src"
+      },
+      {
+        "from": "../public",
+        "to": "core/public"
+      },
+      {
+        "from": "../skills",
+        "to": "core/skills"
+      },
+      {
+        "from": "../fake",
+        "to": "core/fake"
+      },
+      {
+        "from": "../package.json",
+        "to": "core/package.json"
+      },
+      {
+        "from": "../niuma.config.example.json",
+        "to": "core/niuma.config.example.json"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "牛马工作室",
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "language": "2052"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "AI 员工工作室",
+      "syncDesktopName": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Leeeger1",
+        "repo": "niuma-studio"
+      }
+    ]
+  }
+}

@@ -18,7 +18,10 @@ const MOD_HINT = PLATFORM === 'darwin' ? '（macOS 上复制粘贴等用 cmd，�
 let scale = null
 
 // xdotool types multi-byte text only under a UTF-8 locale; minimal systems often run with POSIX.
-const ENV = PLATFORM === 'linux' && !/utf-?8/i.test(process.env.LC_ALL || process.env.LC_CTYPE || process.env.LANG || '') ? { ...process.env, LC_ALL: 'C.UTF-8' } : process.env
+// Apps opened from here must not inherit ELECTRON_RUN_AS_NODE (set when 傻妞 runs inside the desktop app).
+const ENV = { ...process.env }
+delete ENV.ELECTRON_RUN_AS_NODE
+if (PLATFORM === 'linux' && !/utf-?8/i.test(process.env.LC_ALL || process.env.LC_CTYPE || process.env.LANG || '')) ENV.LC_ALL = 'C.UTF-8'
 
 function run(cmd, args, { input, timeout = 30000, encoding = 'utf8' } = {}) {
   return new Promise((resolve, reject) => {
@@ -112,7 +115,7 @@ const linux = {
   },
   async open(target) {
     const isPath = /^[a-z]+:\/\//i.test(target) || fs.existsSync(target)
-    const child = isPath ? spawn('xdg-open', [target], { detached: true, stdio: 'ignore' }) : spawn('sh', ['-c', target], { detached: true, stdio: 'ignore' })
+    const child = isPath ? spawn('xdg-open', [target], { detached: true, stdio: 'ignore', env: ENV }) : spawn('sh', ['-c', target], { detached: true, stdio: 'ignore', env: ENV })
     child.on('error', () => {})
     child.unref()
   },

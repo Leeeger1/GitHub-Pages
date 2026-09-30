@@ -9,14 +9,16 @@ import { startFakeOpenAI } from './openai-server.mjs'
 export async function rehearsalConfig(config, root) {
   const api = await startFakeOpenAI()
   const node = (file) => [process.execPath, path.join(root, 'fake', file)]
+  // 桌面版里 process.execPath 是 Electron：让它以 Node 身份跑替身脚本。
+  const env = process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : undefined
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'niuma-rehearsal-'))
   return {
     close: api.close,
     config: {
       ...config,
       groups: [
-        { id: 'claude', name: 'Claude 组', type: 'claude-cli', command: node('claude.mjs'), color: '#c4602f', models: { hard: 'opus', medium: 'sonnet', easy: 'haiku' } },
-        { id: 'codex', name: 'Codex 组', type: 'codex-cli', command: node('codex.mjs'), color: '#16837a' },
+        { id: 'claude', name: 'Claude 组', type: 'claude-cli', command: node('claude.mjs'), env, color: '#c4602f', models: { hard: 'opus', medium: 'sonnet', easy: 'haiku' } },
+        { id: 'codex', name: 'Codex 组', type: 'codex-cli', command: node('codex.mjs'), env, color: '#16837a' },
         { id: 'deepseek', name: 'DeepSeek 组', type: 'openai-api', baseUrl: api.url, apiKey: 'rehearsal', models: { hard: 'deepseek-v4-pro', medium: 'deepseek-v4-flash', easy: 'deepseek-v4-flash' } },
         { id: 'qwen', name: 'Qwen 组', type: 'openai-api', baseUrl: api.url, apiKey: 'rehearsal', model: 'qwen3-coder' },
       ],

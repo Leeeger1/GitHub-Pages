@@ -13,11 +13,66 @@
     demo: ['帮我做一个待办清单 App', '/招人 数据库专家', '/工具', '/团队'],
   }
 
-  const office = new window.ShaniuOffice($('#office'), $('#overlay'), $('#scene'))
   const state = { mode: 'live', roster: { groups: [], employees: [] }, agents: {}, tasks: [], messages: [], busy: false, round: 0, iteration: 0, workdir: '', meeting: null, lastCommit: null }
   const openTasks = new Set()
   const faces = new Map()
   let transport = null
+
+  // ---- skins -------------------------------------------------------------------
+  // 二次元皮肤用 anime.js（SVG），像素复古用 office.js（canvas）；两者接口一样，可以随时切换。
+  const SKINS = [
+    ['sakura', '樱花'],
+    ['night', '夜班'],
+    ['neon', '赛博霓虹'],
+    ['neko', '猫耳咖啡'],
+    ['pixel', '像素复古'],
+  ]
+  const store = {
+    get(k) {
+      try {
+        return localStorage.getItem(k)
+      } catch {
+        return null
+      }
+    },
+    set(k, v) {
+      try {
+        localStorage.setItem(k, v)
+      } catch {}
+    },
+  }
+  const known = (s) => SKINS.some(([id]) => id === s)
+  const prefersDark = () => window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches
+  let skin = [new URLSearchParams(location.search).get('skin'), store.get('niuma.skin')].find(known) || (prefersDark() ? 'night' : 'sakura')
+
+  function makeOffice(id) {
+    document.documentElement.dataset.skin = id
+    if (id === 'pixel' || !window.AnimeOffice) return new window.ShaniuOffice($('#office'), $('#overlay'), $('#scene'))
+    return new window.AnimeOffice($('#scene'), $('#overlay'), id)
+  }
+  let office = makeOffice(skin)
+
+  function setSkin(id) {
+    if (!known(id) || id === skin) return
+    skin = id
+    store.set('niuma.skin', id)
+    office.destroy?.()
+    office = makeOffice(id)
+    faces.clear()
+    office.setRoster(state.roster)
+    for (const [aid, a] of Object.entries(state.agents)) office.setAgent(aid, a)
+    office.setTasks(state.tasks)
+    if (state.meeting?.status === 'open') office.meeting(state.meeting)
+    renderSkins()
+    renderTeam()
+    renderMessages()
+  }
+
+  function renderSkins() {
+    const box = $('#skins')
+    if (!box) return
+    box.innerHTML = '<span class="skins-label">皮肤</span>' + SKINS.map(([id, name]) => `<button type="button" data-skin="${id}" aria-pressed="${id === skin}">${name}</button>`).join('')
+  }
 
   // ---- helpers ---------------------------------------------------------------
 
@@ -273,7 +328,9 @@
         '这是演示：员工都是演员，不会真的改代码。项目开源在 <a href="https://github.com/Leeeger1/niuma-studio" target="_blank" rel="noopener">GitHub</a>，下载后运行 <code>node bin/niuma.js 你的项目目录</code>，他们就会真的开工。'
       el.hidden = false
     } else if (state.mode === 'fake') {
-      el.innerHTML = '彩排模式：员工都是替身，不花钱、不改文件。去掉 <code>--fake</code> 就是真干活。'
+      el.innerHTML = /Electron/.test(navigator.userAgent)
+        ? '彩排模式：员工都是替身，不花钱、不改文件。在菜单「项目」里取消勾选「彩排模式」就是真干活。'
+        : '彩排模式：员工都是替身，不花钱、不改文件。去掉 <code>--fake</code> 就是真干活。'
       el.hidden = false
     } else el.hidden = true
   }
@@ -429,6 +486,11 @@
     }
   })
   $('#stop').addEventListener('click', () => transport && transport.stop().catch(() => {}))
+  $('#skins')?.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-skin]')
+    if (b) setSkin(b.dataset.skin)
+  })
+  renderSkins()
   $('#undo').addEventListener('click', () => send('/撤销'))
 
   // ---- boot ------------------------------------------------------------------

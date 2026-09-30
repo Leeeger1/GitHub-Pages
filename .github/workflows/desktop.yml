@@ -1,0 +1,77 @@
+name: 桌面安装包
+
+# 推一个 v 开头的标签（比如 v0.2.0）就会在 Windows / macOS / Linux 上各打一个安装包，并发布到 Releases。
+# 也可以在 Actions 页面手动运行，只打包不发布。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: 跑测试
+        if: runner.os == 'Linux'
+        run: npm test
+
+      - name: 安装打包工具
+        working-directory: desktop
+        run: npm ci
+
+      - name: 打包
+        working-directory: desktop
+        run: npx electron-builder --publish never
+        env:
+          # 没有苹果开发者证书，macOS 包不签名（第一次打开要右键 → 打开）。
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: niuma-studio-${{ runner.os }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+            desktop/dist/*.AppImage
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: 牛马工作室 ${{ github.ref_name }}
+          files: dist/*
+          body: |
+            ## 下载
+
+            | 系统 | 下载哪个 |
+            |---|---|
+            | Windows | `niuma-studio-*-win-x64.exe`，双击安装 |
+            | macOS | `niuma-studio-*-mac-universal.dmg`，拖进「应用程序」；第一次打开要右键 → 打开 |
+            | Linux | `niuma-studio-*-linux-x86_64.AppImage`，加上可执行权限后双击 |
+
+            装好以后打开「牛马工作室」，选一个项目文件夹就能开工。员工们用的 Claude Code / Codex 要先在电脑上装好并登录一次；
+            想先看看效果，菜单「项目 → 彩排模式」用替身员工演一遍，不花钱、不改文件。

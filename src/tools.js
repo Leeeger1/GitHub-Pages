@@ -36,6 +36,8 @@ export function builtinTools() {
       keywords: ['桌面', '电脑', '屏幕', '鼠标', '键盘', '软件', '微信', 'excel', 'word', 'ppt', '剪映', 'photoshop', '记事本', '窗口'],
       command: process.execPath,
       args: [path.join(HERE, 'mcp', 'desktop.js')],
+      // 桌面版里 process.execPath 是 Electron，要让它以 Node 身份跑脚本。
+      env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {},
       vision: true,
       takesOver: true,
     },

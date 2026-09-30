@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
-import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { rehearsalConfig } from '../fake/rehearsal.mjs'
-import { loadConfig } from '../src/config.js'
-import { Coordinator } from '../src/coordinator.js'
-import { createServer, isLoopback } from '../src/server.js'
+import { isLoopback } from '../src/server.js'
+import { startStudio } from '../src/studio.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -75,23 +72,6 @@ function lanAddress() {
   return 'localhost'
 }
 
-function listen(server, port, host, tries = 10) {
-  return new Promise((resolve, reject) => {
-    const onError = (e) => {
-      server.off('listening', onListening)
-      if (e.code === 'EADDRINUSE' && tries > 1) resolve(listen(server, port + 1, host, tries - 1))
-      else reject(e)
-    }
-    const onListening = () => {
-      server.off('error', onError)
-      resolve(port)
-    }
-    server.once('error', onError)
-    server.once('listening', onListening)
-    server.listen(port, host)
-  })
-}
-
 const args = parseArgs(process.argv.slice(2))
 const workdir = args.workdir || process.cwd()
 if (!fs.existsSync(workdir) || !fs.statSync(workdir).isDirectory()) {
@@ -99,28 +79,22 @@ if (!fs.existsSync(workdir) || !fs.statSync(workdir).isDirectory()) {
   process.exit(1)
 }
 
-let config = loadConfig({ workdir, configFile: args.configFile, overrides: args.overrides })
-let closeFake = () => {}
-if (args.fake) {
-  const r = await rehearsalConfig(config, root)
-  config = { ...r.config, workdir, sources: config.sources }
-  closeFake = r.close
+let studio
+try {
+  studio = await startStudio({ root, workdir, configFile: args.configFile, overrides: args.overrides, fake: args.fake })
+} catch (e) {
+  console.error(`启动失败：${e.message}`)
+  process.exit(1)
 }
-
-const coord = new Coordinator(config, { mode: args.fake ? 'fake' : 'live', root })
-const token = isLoopback(config.host) ? '' : crypto.randomBytes(12).toString('hex')
-const server = createServer(coord, { publicDir: path.join(root, 'public'), host: config.host, token })
+const { coord, config, port, token } = studio
 
 const shutdown = () => {
-  coord.stopAll()
-  closeFake()
+  studio.close()
   setTimeout(() => process.exit(0), 300)
 }
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
 
-await coord.init()
-const port = await listen(server, config.port || 7777, config.host)
 const shownHost = isLoopback(config.host) ? 'localhost' : lanAddress()
 const url = `http://${shownHost}:${port}/${token ? `?token=${token}` : ''}`
 
